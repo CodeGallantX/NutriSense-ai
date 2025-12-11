@@ -92,7 +92,7 @@ export default function SignInPage() {
           <div className="mt-4 text-center text-sm">
             {"Don't have an account? "}
             <Link
-              href="/auth/signup"
+              href="/signup"
               className="text-teal-600 hover:text-teal-700 font-medium"
             >
               Sign up

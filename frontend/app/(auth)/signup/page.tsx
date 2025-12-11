@@ -14,6 +14,7 @@ import Link from "next/link"
 export default function SignUpPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")    // ✔ FIXED
   const [fullName, setFullName] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +27,13 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
     setMessage(null)
+
+    // ✔ PASSWORD MATCH CHECK
+    if (password !== confirmPassword) {
+      setError("Passwords don't match")
+      setLoading(false)
+      return
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -101,6 +109,19 @@ export default function SignUpPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">Must be at least 6 characters</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmpassword">Confirm Password</Label>
+              <Input
+                id="confirmpassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={6}
               />
