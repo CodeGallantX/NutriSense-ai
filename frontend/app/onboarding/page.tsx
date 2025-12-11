@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -7,156 +6,383 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatePresence, motion } from "framer-motion";
 
-const dietaryOptions = [
-  "Vegetarian",
-  "Vegan",
-  "Halal",
-  "Kosher",
-  "Gluten-Free",
-  "Dairy-Free",
-  "Pescatarian",
-];
-const cuisineOptions = [
-  "Italian",
-  "Chinese",
-  "Indian",
-  "Mexican",
-  "Japanese",
-  "Thai",
-  "Mediterranean",
-  "American",
-  "Middle Eastern",
-  "Korean",
-];
-const healthConditions = [
-  "Type 2 Diabetes",
-  "Type 1 Diabetes",
-  "Prediabetes",
-  "Hypertension",
-  "High Cholesterol",
-  "Heart Disease",
-  "Celiac Disease",
+interface BaseField {
+  key: string;
+  label: string;
+  description: string;
+}
+
+interface NumberField extends BaseField {
+  type: "number";
+  placeholder: string;
+  unit: string;
+}
+
+interface TextField extends BaseField {
+  type: "text";
+  placeholder: string;
+  unit: string;
+}
+
+interface SelectField extends BaseField {
+  type: "select";
+  options: { value: string; label: string }[];
+}
+
+interface CheckboxField extends BaseField {
+  type: "checkboxes";
+  options: string[];
+}
+
+type Field = NumberField | TextField | SelectField | CheckboxField;
+
+const allFields: Field[] = [
+  // Step 1: Age
+  {
+    key: "age",
+    label: "How old are you?",
+    type: "number",
+    placeholder: "25",
+    unit: "years",
+    description: "We use your age to personalize your daily recommendations.",
+  },
+  // Step 2: Gender
+  {
+    key: "gender",
+    label: "What is your gender?",
+    type: "select",
+    options: [
+      { value: "male", label: "Male" },
+      { value: "female", label: "Female" },
+    ],
+    description: "This helps tailor advice to your body.",
+  },
+  // Step 3: Weight
+  {
+    key: "weight",
+    label: "What is your weight?",
+    type: "number",
+    placeholder: "70",
+    unit: "kg",
+    description: "We'll use this for nutritional calculations.",
+  },
+  // Step 4: Height
+  {
+    key: "height",
+    label: "What is your height?",
+    type: "number",
+    placeholder: "175",
+    unit: "cm",
+    description: "This helps determine your ideal weight range.",
+  },
+  // Step 5: Activity Level
+  {
+    key: "activityLevel",
+    label: "What is your activity level?",
+    type: "select",
+    options: [
+      { value: "sedentary", label: "Sedentary (little or no exercise)" },
+      { value: "light", label: "Light (exercise 1-3 days/week)" },
+      { value: "moderate", label: "Moderate (exercise 3-5 days/week)" },
+      { value: "active", label: "Active (exercise 6-7 days/week)" },
+      {
+        value: "very_active",
+        label: "Very Active (physical job or 2x training)",
+      },
+    ],
+    description: "Adjusts your calorie needs based on movement.",
+  },
+  // Step 6: Dietary Preferences
+  {
+    key: "dietary",
+    label: "Any dietary preferences?",
+    type: "checkboxes",
+    options: [
+      "Vegetarian",
+      "Vegan",
+      "Halal",
+      "Kosher",
+      "Gluten-Free",
+      "Dairy-Free",
+      "Pescatarian",
+    ],
+    description: "We'll suggest meals that fit your style.",
+  },
+  // Step 7: Allergies
+  {
+    key: "allergies",
+    label: "Any allergies?",
+    type: "text",
+    unit: "",
+    placeholder: "peanuts, shellfish, soy",
+    description: "List them comma-separated to avoid them.",
+  },
+  // Step 8: Health Conditions
+  {
+    key: "healthConditions",
+    label: "Any health conditions?",
+    type: "checkboxes",
+    options: [
+      "Type 2 Diabetes",
+      "Type 1 Diabetes",
+      "Prediabetes",
+      "Hypertension",
+      "High Cholesterol",
+      "Heart Disease",
+      "Celiac Disease",
+    ],
+    description: "This ensures safe, targeted recommendations.",
+  },
+  // Step 9: Monthly Budget
+  {
+    key: "monthlyBudget",
+    label: "What's your monthly food budget?",
+    type: "number",
+    placeholder: "300",
+    unit: "USD",
+    description: "Helps find affordable meal ideas.",
+  },
+  // Step 10: Cuisines
+  {
+    key: "cuisines",
+    label: "Preferred cuisines?",
+    type: "checkboxes",
+    options: [
+      "Italian",
+      "Chinese",
+      "Indian",
+      "Mexican",
+      "Japanese",
+      "Thai",
+      "Mediterranean",
+      "American",
+      "Middle Eastern",
+      "Korean",
+    ],
+    description: "We'll mix in flavors you love.",
+  },
 ];
 
-const steps = [
-  {
-    title: "Basic Information",
-    description: "Let's start with some basics about you",
-    fields: [
-      {
-        key: "age",
-        label: "How old are you?",
-        type: "number",
-        placeholder: "25",
-        unit: "years",
-        description:
-          "We use your age to personalize your daily recommendations.",
-      },
-      {
-        key: "gender",
-        label: "What is your gender?",
-        type: "select",
-        options: [
-          { value: "male", label: "Male" },
-          { value: "female", label: "Female" },
-          { value: "other", label: "Other" },
-          { value: "prefer_not_to_say", label: "Prefer not to say" },
-        ],
-        description: "This helps tailor advice to your body.",
-      },
-      {
-        key: "weight",
-        label: "What is your weight?",
-        type: "number",
-        placeholder: "70",
-        unit: "kg",
-        description: "We'll use this for nutritional calculations.",
-      },
-      {
-        key: "height",
-        label: "What is your height?",
-        type: "number",
-        placeholder: "175",
-        unit: "cm",
-        description: "This helps determine your ideal weight range.",
-      },
-      {
-        key: "activityLevel",
-        label: "What is your activity level?",
-        type: "select",
-        options: [
-          { value: "sedentary", label: "Sedentary (little or no exercise)" },
-          { value: "light", label: "Light (exercise 1-3 days/week)" },
-          { value: "moderate", label: "Moderate (exercise 3-5 days/week)" },
-          { value: "active", label: "Active (exercise 6-7 days/week)" },
-          {
-            value: "very_active",
-            label: "Very Active (physical job or 2x training)",
-          },
-        ],
-        description: "Adjusts your calorie needs based on movement.",
-      },
-    ],
-  },
-  {
-    title: "Dietary Preferences & Health",
-    description: "Tell us about your diet and health",
-    fields: [
-      {
-        key: "dietary",
-        label: "Any dietary preferences?",
-        type: "checkboxes",
-        options: dietaryOptions,
-        description: "We'll suggest meals that fit your style.",
-      },
-      {
-        key: "allergies",
-        label: "Any allergies?",
-        type: "text",
-        placeholder: "peanuts, shellfish, soy",
-        description: "List them comma-separated to avoid them.",
-      },
-      {
-        key: "healthConditions",
-        label: "Any health conditions?",
-        type: "checkboxes",
-        options: healthConditions,
-        description: "This ensures safe, targeted recommendations.",
-      },
-    ],
-  },
-  {
-    title: "Budget & Cuisine Preferences",
-    description: "Wrap up with your tastes and budget",
-    fields: [
-      {
-        key: "monthlyBudget",
-        label: "What's your monthly food budget?",
-        type: "number",
-        placeholder: "300",
-        unit: "USD",
-        description: "Helps find affordable meal ideas.",
-      },
-      {
-        key: "cuisines",
-        label: "Preferred cuisines?",
-        type: "checkboxes",
-        options: cuisineOptions,
-        description: "We'll mix in flavors you love.",
-      },
-    ],
-  },
-];
+interface FormData {
+  age: string;
+  weight: string;
+  height: string;
+  gender: string;
+  activityLevel: string;
+  monthlyBudget: string;
+  selectedDietary: string[];
+  selectedCuisines: string[];
+  allergies: string;
+  selectedConditions: string[];
+  hasDiabetes: boolean;
+  diabetesType: string;
+  targetBSMin: string;
+  targetBSMax: string;
+}
+
+function NumberOrTextInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: NumberField | TextField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="relative">
+      <Input
+        id={field.key}
+        type={field.type}
+        placeholder={field.placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-16 text-2xl text-center border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none px-4"
+      />
+      {field.unit && (
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg text-gray-500">
+          {field.unit}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CustomSelect({
+  field,
+  value,
+  onChange,
+}: {
+  field: SelectField;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3 max-h-96">
+      {field.options.map((opt) => {
+        const selected = value === opt.value;
+        return (
+          <motion.button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`p-4 rounded-xl border-2 text-center font-medium text-lg ${
+              selected
+                ? "border-green-500 bg-green-50 text-green-700"
+                : "border-gray-200 hover:border-gray-300"
+            }`}
+            whileHover={{ scale: selected ? 1 : 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {opt.label}
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CheckboxList({
+  field,
+  value,
+  onToggle,
+}: {
+  field: CheckboxField;
+  value: string[];
+  onToggle: (option: string) => void;
+}) {
+  return (
+    <div className="max-h-96 overflow-y-auto space-y-3 p-4">
+      {value.length === 0 && (
+        <p className="text-sm text-gray-500 text-center">None selected</p>
+      )}
+      <div className="grid grid-cols-1 gap-3">
+        {field.options.map((option) => (
+          <motion.div
+            key={option}
+            className="flex items-center justify-center space-x-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer border border-gray-200"
+            onClick={() => onToggle(option)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Checkbox
+              id={option}
+              checked={value.includes(option)}
+              onCheckedChange={() => onToggle(option)}
+              className="h-6 w-6"
+            />
+            <label htmlFor={option} className="text-lg cursor-pointer">
+              {option}
+            </label>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FieldRenderer({
+  field,
+  formData,
+  onInputChange,
+  onCheckboxToggle,
+}: {
+  field: Field;
+  formData: FormData;
+  onInputChange: (key: string, value: string | string[]) => void;
+  onCheckboxToggle: (key: string, option: string) => void;
+}) {
+  const value = formData[field.key as keyof FormData] as
+    | string
+    | string[]
+    | undefined;
+  const stringValue = typeof value === "string" ? value : "";
+
+  switch (field.type) {
+    case "number":
+    case "text":
+      return (
+        <div className="flex-1 space-y-4">
+          <NumberOrTextInput
+            field={field}
+            value={stringValue}
+            onChange={(v) => onInputChange(field.key, v)}
+          />
+        </div>
+      );
+    case "select":
+      return (
+        <div className="flex-1 space-y-4 w-full">
+          <CustomSelect
+            field={field}
+            value={stringValue}
+            onChange={(v) => onInputChange(field.key, v)}
+          />
+        </div>
+      );
+    case "checkboxes":
+      return (
+        <div className="flex-1 space-y-4">
+          <CheckboxList
+            field={field}
+            value={Array.isArray(value) ? value : []}
+            onToggle={(option) => onCheckboxToggle(field.key, option)}
+          />
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
+function DiabetesSection({
+  formData,
+  onInputChange,
+}: {
+  formData: FormData;
+  onInputChange: (key: string, value: string) => void;
+}) {
+  if (!formData.hasDiabetes) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-4 p-6 bg-blue-50 rounded-xl mt-6"
+    >
+      <h4 className="font-medium text-blue-900 text-lg text-center">
+        Diabetes Management Settings
+      </h4>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label className="text-sm text-center block">
+            Target Blood Sugar Min (mg/dL)
+          </Label>
+          <Input
+            type="number"
+            placeholder="80"
+            value={formData.targetBSMin}
+            onChange={(e) => onInputChange("targetBSMin", e.target.value)}
+            className="h-12 text-lg text-center border-2 border-gray-200 rounded-lg focus:border-green-500"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-sm text-center block">
+            Target Blood Sugar Max (mg/dL)
+          </Label>
+          <Input
+            type="number"
+            placeholder="130"
+            value={formData.targetBSMax}
+            onChange={(e) => onInputChange("targetBSMax", e.target.value)}
+            className="h-12 text-lg text-center border-2 border-gray-200 rounded-lg focus:border-green-500"
+          />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -164,38 +390,36 @@ export default function OnboardingPage() {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
 
-  // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     age: "",
     weight: "",
     height: "",
     gender: "",
     activityLevel: "",
     monthlyBudget: "",
-    selectedDietary: [] as string[],
-    selectedCuisines: [] as string[],
+    selectedDietary: [],
+    selectedCuisines: [],
     allergies: "",
-    selectedConditions: [] as string[],
+    selectedConditions: [],
     hasDiabetes: false,
     diabetesType: "",
     targetBSMin: "",
     targetBSMax: "",
   });
 
-  const currentStepData = steps[step - 1];
+  const currentField = allFields[step - 1];
 
   const handleInputChange = (key: string, value: string | string[]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleCheckboxToggle = (key: string, option: string) => {
-    const current = formData[key as keyof typeof formData] as string[];
+    const current = formData[key as keyof FormData] as string[];
     const newSelection = current.includes(option)
       ? current.filter((item) => item !== option)
       : [...current, option];
     handleInputChange(key, newSelection);
 
-    // Handle diabetes logic
     if (key === "selectedConditions") {
       const isDiabetes = option.toLowerCase().includes("diabetes");
       if (isDiabetes && !current.includes(option)) {
@@ -227,7 +451,7 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
-    if (step < steps.length) {
+    if (step < allFields.length) {
       setStep((prev) => prev + 1);
     }
   };
@@ -297,204 +521,90 @@ export default function OnboardingPage() {
     router.push("/dashboard");
   };
 
-  const progress = ((step - 1) / (steps.length - 1)) * 100;
-
-  const renderField = (field: any) => {
-    const value = formData[field.key as keyof typeof formData];
-    switch (field.type) {
-      case "number":
-      case "text":
-        return (
-          <div className="space-y-2">
-            <Label className="text-base font-medium">{field.label}</Label>
-            <div className="relative">
-              <Input
-                id={field.key}
-                type={field.type}
-                placeholder={field.placeholder}
-                value={typeof value === "string" ? value : ""}
-                onChange={(e) => handleInputChange(field.key, e.target.value)}
-                className="pl-3 pr-20 py-4 text-lg border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
-              />
-              {field.unit && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-                  {field.unit}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-600 mt-1">{field.description}</p>
-          </div>
-        );
-      case "select":
-        return (
-          <div className="space-y-2">
-            <Label className="text-base font-medium">{field.label}</Label>
-            <Select
-              value={typeof value === "string" ? value : ""}
-              onValueChange={(v) => handleInputChange(field.key, v)}
-            >
-              <SelectTrigger className="py-4 text-lg border-2 border-gray-200 rounded-lg focus:border-green-500">
-                <SelectValue placeholder="Select..." />
-              </SelectTrigger>
-              <SelectContent>
-                {field.options.map((opt: any) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-gray-600 mt-1">{field.description}</p>
-          </div>
-        );
-      case "checkboxes":
-        return (
-          <div className="space-y-2">
-            <Label className="text-base font-medium">{field.label}</Label>
-            <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-              {(value as string[]).length === 0 && (
-                <p className="text-sm text-gray-500 col-span-2">
-                  None selected
-                </p>
-              )}
-              {field.options.map((option: string) => (
-                <div
-                  key={option}
-                  className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleCheckboxToggle(field.key, option)}
-                >
-                  <Checkbox
-                    id={option}
-                    checked={(value as string[]).includes(option)}
-                    onCheckedChange={() =>
-                      handleCheckboxToggle(field.key, option)
-                    }
-                  />
-                  <label htmlFor={option} className="text-sm cursor-pointer">
-                    {option}
-                  </label>
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-gray-600 mt-1">{field.description}</p>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderDiabetesSection = () => {
-    if (!formData.hasDiabetes) return null;
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-4 p-4 bg-blue-50 rounded-lg mt-4"
-      >
-        <h4 className="font-medium text-blue-900 text-base">
-          Diabetes Management Settings
-        </h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="text-sm">Target Blood Sugar Min (mg/dL)</Label>
-            <Input
-              type="number"
-              placeholder="80"
-              value={formData.targetBSMin}
-              onChange={(e) => handleInputChange("targetBSMin", e.target.value)}
-              className="py-3 border-2 border-gray-200 rounded-lg focus:border-green-500"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-sm">Target Blood Sugar Max (mg/dL)</Label>
-            <Input
-              type="number"
-              placeholder="130"
-              value={formData.targetBSMax}
-              onChange={(e) => handleInputChange("targetBSMax", e.target.value)}
-              className="py-3 border-2 border-gray-200 rounded-lg focus:border-green-500"
-            />
-          </div>
-        </div>
-      </motion.div>
-    );
-  };
+  const progress = (step / allFields.length) * 100;
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-teal-50 via-white to-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-serif text-gray-900 mb-2">NutriSense AI</h1>
-          <div className="w-full bg-gray-200 rounded-full h-1">
-            <motion.div
-              className="bg-green-500 h-1 rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.5 }}
-            />
+    <div className="min-h-screen flex flex-col bg-linear-to-br from-teal-50 via-white to-blue-50 p-4">
+      <div className="w-full max-w-sm mx-auto flex flex-col flex-1">
+        <div className="flex-1">
+          {/* TOP SECTION */}
+          <div className="mb-4">
+            <h1 className="text-3xl font-serif text-gray-900 text-center mb-4">
+              NutriSense AI
+            </h1>
+
+            <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
+              <motion.div
+                className="bg-[#018075] h-1 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+
+            <p className="text-sm text-gray-500 text-center">
+              Step {step} of {allFields.length}
+            </p>
+
+            <h2 className="text-2xl font-medium text-gray-900 text-center mt-6">
+              {currentField.label}
+            </h2>
           </div>
-          <p className="text-sm text-gray-500 mt-2">
-            Step {step} of {steps.length}
-          </p>
+
+          {/* MIDDLE SECTION */}
+          <div className="flex-1 flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="w-full"
+              >
+                <FieldRenderer
+                  field={currentField}
+                  formData={formData}
+                  onInputChange={handleInputChange}
+                  onCheckboxToggle={handleCheckboxToggle}
+                />
+
+                {step === 8 && (
+                  <DiabetesSection
+                    formData={formData}
+                    onInputChange={handleInputChange}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                {currentStepData.title}
-              </h2>
-              <p className="text-sm text-gray-600">
-                {currentStepData.description}
-              </p>
-            </div>
+        {/* BOTTOM SECTION */}
+        <div className="shrink-0 mt-6 pb-4 flex flex-col items-center gap-4">
+          <p className="text-sm text-gray-600 text-center max-w-xs">
+            {currentField.description}
+          </p>
 
-            <div className="space-y-6">
-              {currentStepData.fields.map((field) => (
-                <motion.div
-                  key={field.key}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  {renderField(field)}
-                </motion.div>
-              ))}
-              {step === 2 && renderDiabetesSection()}
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              {step > 1 && (
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                  className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  Back
-                </Button>
-              )}
-              <Button
-                onClick={step === steps.length ? handleSubmit : handleNext}
-                className="flex-1 text-white py-3 rounded-lg font-medium"
-                disabled={loading}
-              >
-                {loading
-                  ? "Saving..."
-                  : step === steps.length
-                  ? "Complete Setup"
-                  : "Continue"}
+          <div className="flex gap-3 w-full">
+            {step > 1 && (
+              <Button variant="outline" onClick={handleBack} className="flex-1 h-10 sm:h-12 rounded-lg text-sm sm:text-md">
+                Back
               </Button>
-            </div>
-          </motion.div>
-        </AnimatePresence>
+            )}
+
+            <Button
+              onClick={step === allFields.length ? handleSubmit : handleNext}
+              disabled={loading}
+              className="flex-1 h-10 sm:h-12 rounded-lg text-sm sm:text-md"
+            >
+              {loading
+                ? "Saving..."
+                : step === allFields.length
+                ? "Complete Setup"
+                : "Next"}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
