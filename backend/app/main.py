@@ -1,5 +1,5 @@
 from ultralytics import YOLO
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from io import BytesIO
 from PIL import Image
 from pathlib import Path
@@ -9,6 +9,27 @@ import numpy as np
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from app.services.classification_service import classify_food
+import logging
+
+# Import new modules for YOLO + DeepSeek + Heuristics
+from app.yolo import YOLOFoodDetector
+from app.deepseek import DeepSeekFoodDetector
+from app.fusion import DetectionFusion
+from app.heuristics import FoodHeuristics
+from app.scan_models import (
+    ScanFoodResponse,
+    FoodDetection as ScanFoodItem,
+    MealSummary as ScanMealSummary,
+    MealRecommendations as ScanMealRecommendations,
+    ErrorResponse
+)
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # --- Pydantic Models for Request/Response Schemas ---
@@ -220,11 +241,64 @@ app = FastAPI(
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# YOLO models
+# YOLO models (original implementation)
 YOLO_PATH = BASE_DIR / "ml_models" / "yolo" / "best.onnx"
 YOLO_SEG_PATH = BASE_DIR / "ml_models" / "yolo" / "best-seg.onnx"
 _yolo_model = None
 _yolo_seg_model = None
+
+# New integrated models (YOLO + DeepSeek + Heuristics)
+_yolo_detector = None
+_deepseek_detector = None
+_fusion_engine = None
+_heuristics_engine = None
+
+def get_yolo_detector():
+    """Get or initialize YOLO food detector for /scan-food endpoint."""
+    global _yolo_detector
+    if _yolo_detector is None:
+        try:
+            logger.info("Initializing YOLO detector for /scan-food...")
+            _yolo_detector = YOLOFoodDetector()
+            logger.info("YOLO detector initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize YOLO detector: {e}")
+            raise
+    return _yolo_detector
+
+def get_deepseek_detector():
+    """Get or initialize DeepSeek-VL2 detector for /scan-food endpoint."""
+    global _deepseek_detector
+    if _deepseek_detector is None:
+        try:
+            logger.info("Initializing DeepSeek-VL2 detector...")
+            _deepseek_detector = DeepSeekFoodDetector()
+            logger.info("DeepSeek-VL2 detector initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize DeepSeek detector: {e}")
+            # Don't raise - DeepSeek is optional
+            _deepseek_detector = None
+    return _deepseek_detector
+
+def get_fusion_engine():
+    """Get or initialize fusion engine."""
+    global _fusion_engine
+    if _fusion_engine is None:
+        _fusion_engine = DetectionFusion()
+    return _fusion_engine
+
+def get_heuristics_engine():
+    """Get or initialize heuristics engine."""
+    global _heuristics_engine
+    if _heuristics_engine is None:
+        try:
+            logger.info("Initializing heuristics engine...")
+            _heuristics_engine = FoodHeuristics()
+            logger.info("Heuristics engine initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize heuristics engine: {e}")
+            raise
+    return _heuristics_engine
 
 def get_yolo_model():
     global _yolo_model
@@ -606,13 +680,23 @@ def apply_missing_ingredient_heuristics(foods: List[Dict[str, Any]]) -> List[Dic
     # If carbs dominate and protein is low, add estimated protein side
     if totals["total_carbs"] > 40 and totals["total_protein"] < 15:
         base = MEAL_TEMPLATES["high_carb_low_protein"].copy()
-        base.update({"confidence": 0.3, "source": "Heuristic"})
+        base.update({
+            "confidence": 0.3,
+            "source": "Heuristic",
+            "advice": "Add protein side for balance",
+            "flags": ["protein-side"]
+        })
         additions.append(base)
 
     # If fiber is very low, add estimated vegetables
     if totals["total_fiber"] < 5:
         base = MEAL_TEMPLATES["low_fiber"].copy()
-        base.update({"confidence": 0.3, "source": "Heuristic"})
+        base.update({
+            "confidence": 0.3,
+            "source": "Heuristic",
+            "advice": "Add vegetables to boost fiber",
+            "flags": ["vegetable", "fiber-rich"]
+        })
         additions.append(base)
 
     return foods + additions
@@ -702,9 +786,177 @@ def health():
 
 
 @app.post(
+    "/scan-food-yolo-deepseek/",
+    tags=["Food Detection"],
+    summary="Advanced Food Detection (YOLO + DeepSeek-VL2)",
+    response_model=ScanFoodResponse,
+    responses={
+        200: {"description": "Successful food detection and analysis using YOLO + DeepSeek fusion"},
+        400: {"description": "Invalid image format"},
+        404: {"description": "No foods detected in image"},
+        500: {"description": "Server error during detection or analysis"}
+    }
+)
+async def scan_food_yolo_deepseek(
+    file: UploadFile = File(..., description="Food image file (JPEG, PNG, etc.)")
+):
+    """
+    **Advanced Food Detection using YOLO + DeepSeek-VL2 with Heuristics**
+    
+    This endpoint implements the fusion strategy:
+    - **YOLO** acts as the precise anchor (trusted results)
+    - **DeepSeek-VL2** fills in missing items (gaps only)
+    - **Heuristics** enhance with nutrition, flags, glycemic info
+    
+    **Detection Strategy:**
+    1. Run YOLO detection (high precision, trusted anchor)
+    2. Run DeepSeek-VL2 with strict food detector prompt
+    3. Fuse results: YOLO ∪ (DeepSeek - YOLO)
+    4. Apply heuristics for nutrition data
+    5. Calculate meal summary and recommendations
+    
+    **Input:**
+    - **file**: Image of a meal or food items
+    
+    **Output:**
+    ```json
+    {
+      "detected_items": [
+        {
+          "name": "jollof rice",
+          "confidence": 0.87,
+          "source": "yolo",
+          "calories": 180,
+          "carbs": 35,
+          "protein": 4,
+          "fat": 3,
+          "fiber": 1,
+          "glycemic_index": 72,
+          "flags": ["carb-heavy", "starchy"],
+          "warnings": {...},
+          "portion_advice": "High GI - limit portion"
+        }
+      ],
+      "meal_summary": {
+        "item_count": 3,
+        "total_calories": 650,
+        "glycemic_load": 58,
+        "score": 72.3,
+        "quality": "Good",
+        "recommendations": [...],
+        "warnings": [...]
+      },
+      "recommendations": {
+        "healthy_alternatives": [...],
+        "portion_adjustments": [...],
+        "additions": [...]
+      },
+      "fusion_stats": {
+        "total_items": 3,
+        "yolo_items": 2,
+        "deepseek_items": 1
+      }
+    }
+    ```
+    
+    **Benefits:**
+    - Deterministic (no hallucinations)
+    - YOLO precision + DeepSeek coverage
+    - Rich nutrition data and recommendations
+    """
+    try:
+        # Load and validate image
+        try:
+            image_bytes = await file.read()
+            image = Image.open(BytesIO(image_bytes))
+            
+            # Convert to RGB if needed
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+                
+            logger.info(f"Processing image: {image.size}, mode: {image.mode}")
+            
+        except Exception as e:
+            logger.error(f"Invalid image format: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
+        
+        # Step 1: YOLO Detection
+        logger.info("Step 1: Running YOLO detection...")
+        yolo_detector = get_yolo_detector()
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25)
+        logger.info(f"YOLO detected {len(yolo_results)} items")
+        
+        # Step 2: DeepSeek Detection (optional - graceful fallback)
+        deepseek_results = []
+        try:
+            logger.info("Step 2: Running DeepSeek-VL2 detection...")
+            deepseek_detector = get_deepseek_detector()
+            if deepseek_detector:
+                deepseek_results = deepseek_detector.detect_foods(image, confidence_threshold=0.3)
+                logger.info(f"DeepSeek detected {len(deepseek_results)} items")
+            else:
+                logger.warning("DeepSeek detector not available, using YOLO only")
+        except Exception as e:
+            logger.warning(f"DeepSeek detection failed, continuing with YOLO only: {e}")
+        
+        # Step 3: Fusion
+        logger.info("Step 3: Fusing detection results...")
+        fusion_engine = get_fusion_engine()
+        fused_results = fusion_engine.fuse(yolo_results, deepseek_results)
+        
+        if not fused_results:
+            logger.warning("No foods detected in image")
+            raise HTTPException(
+                status_code=404,
+                detail="No foods detected in image. Please try a clearer image with visible food items."
+            )
+        
+        # Get fusion statistics
+        fusion_stats = fusion_engine.get_statistics(fused_results)
+        logger.info(f"Fusion complete: {fusion_stats}")
+        
+        # Step 4: Apply Heuristics
+        logger.info("Step 4: Applying heuristics and enriching data...")
+        heuristics_engine = get_heuristics_engine()
+        
+        enriched_items = []
+        for item in fused_results:
+            enriched = heuristics_engine.enrich_food_item(item)
+            enriched_items.append(enriched)
+        
+        # Step 5: Calculate Meal Summary
+        logger.info("Step 5: Calculating meal summary...")
+        meal_summary = heuristics_engine.calculate_meal_summary(enriched_items)
+        
+        # Step 6: Generate Recommendations
+        logger.info("Step 6: Generating recommendations...")
+        recommendations = heuristics_engine.generate_meal_recommendations(
+            enriched_items,
+            meal_summary
+        )
+        
+        # Build response
+        response = ScanFoodResponse(
+            detected_items=[ScanFoodItem(**item) for item in enriched_items],
+            meal_summary=ScanMealSummary(**meal_summary),
+            recommendations=ScanMealRecommendations(**recommendations),
+            fusion_stats=fusion_stats
+        )
+        
+        logger.info("Food detection complete!")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during food detection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post(
     "/scan-food/",
     tags=["Food Detection"],
-    summary="Basic Food Analysis",
+    summary="Basic Food Analysis (Legacy)",
     response_model=MealAnalysisResponse,
     responses={
         200: {"description": "Successful meal analysis with nutrition and recommendations"},

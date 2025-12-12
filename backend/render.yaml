@@ -2,15 +2,26 @@ services:
   - type: web
     name: nutrisense-api
     env: python
-    plan: starter
+    plan: starter  
     branch: main
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     envVars:
       - key: HF_TOKEN
-        fromService: secret
+        fromService: secret 
       - key: YOLO_CONFIG_DIR
         value: "/tmp/Ultralytics"
+      - key: TRANSFORMERS_CACHE
+        value: "/tmp/huggingface_cache"  # Cache for DeepSeek-VL2 models
+      - key: HF_HOME
+        value: "/tmp/huggingface_home"
       # - key: DATABASE_URL
       #   value: "No database used currently"
+    
+    # Performance notes:
+    # - YOLO runs efficiently on CPU with ONNX runtime
+    # - DeepSeek-VL2 small (~2GB) requires 4GB+ RAM recommended
+    # - First request will be slow (model download ~2-3GB)
+    # - Subsequent requests use cached models
+
