@@ -3,6 +3,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getUserProfile } from "@/app/actions/chat"
+import type { Profile } from "@/types/database"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   ArrowRight, TrendingUp, Apple, Scale, Heart, Upload, Camera, CheckCircle, 
@@ -480,16 +483,84 @@ export default function SmartNutritionPage() {
   const [step, setStep] = useState<"welcome" | "goal" | "tracking" | "dashboard">("welcome")
   const [selectedGoal, setSelectedGoal] = useState<TrackingGoal | null>(null)
   const [trackingMethod, setTrackingMethod] = useState<string | null>(null)
-
-  const [userProfile] = useState<UserProfile>({
-    name: "Alex", age: 32, weight: 75, height: 178, goal: "weight", dietType: "balanced",
-    healthConditions: ["diabetes"], activityLevel: "moderate", dailyCalorieTarget: 2200
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: "Loading...", age: 0, weight: 0, height: 0, goal: "weight", dietType: "balanced",
+    healthConditions: [], activityLevel: "moderate", dailyCalorieTarget: 2200
   })
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const supabase = getSupabaseBrowserClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          const profile = await getUserProfile(user.id)
+          
+          if (profile) {
+            // Map database profile to UserProfile interface
+            setUserProfile({
+              name: profile.full_name || "User",
+              age: profile.age || 0,
+              weight: profile.weight_kg || 0,
+              height: profile.height_cm || 0,
+              goal: (profile.primary_goal?.toLowerCase() as TrackingGoal) || "weight",
+              dietType: (profile.eating_pattern?.toLowerCase() as DietType) || "balanced",
+              healthConditions: profile.health_conditions?.map(hc => hc.toLowerCase() as HealthCondition) || [],
+              activityLevel: profile.activity_level || "moderate",
+              dailyCalorieTarget: calculateDailyCalories(profile)
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    loadProfile()
+  }, [])
+
+  function calculateDailyCalories(profile: Profile): number {
+    // Basic BMR calculation using Mifflin-St Jeor Equation
+    if (!profile.weight_kg || !profile.height_cm || !profile.age) return 2000
+    
+    let bmr: number
+    if (profile.gender === "male") {
+      bmr = (10 * profile.weight_kg) + (6.25 * profile.height_cm) - (5 * profile.age) + 5
+    } else {
+      bmr = (10 * profile.weight_kg) + (6.25 * profile.height_cm) - (5 * profile.age) - 161
+    }
+    
+    // Activity multiplier
+    const activityMultipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      active: 1.725,
+      very_active: 1.9
+    }
+    
+    return Math.round(bmr * (activityMultipliers[profile.activity_level || "moderate"]))
+  }
 
   const handleSelectGoal = (goal: TrackingGoal) => { setSelectedGoal(goal); setStep("goal") }
   const handleSelectMethod = (method: string) => { setTrackingMethod(method); setStep("tracking") }
   const handleCompleteTracking = () => { toast({ title: "Saved!", description: "Entry recorded." }); setStep("dashboard") }
   const handleBackToWelcome = () => { setStep("welcome"); setSelectedGoal(null); setTrackingMethod(null) }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

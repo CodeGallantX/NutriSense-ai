@@ -3,13 +3,41 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Sparkles, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Camera, Upload, Sparkles, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { sendFoodAnalysisMessage, createConversation } from "@/app/actions/chat";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // Define BACKEND_API (use env var or fallback to production)
 const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "https://nutrisense-ai-y5xx.onrender.com";
+
+type PipelineStage = "idle" | "detecting" | "analyzing" | "insights";
+
+type DetectionItem = {
+  name?: string;
+  confidence?: number;
+  calories?: number;
+  carbs?: number;
+  protein?: number;
+  fat?: number;
+  fiber?: number;
+  glycemic_index?: number;
+  flags?: string[];
+  source?: string;
+};
+
+type FinalResult = {
+  detected_items: DetectionItem[];
+  meal_summary?: Record<string, any>;
+  recommendations?: Record<string, any>;
+  raw?: {
+    yolo?: any;
+    flagship?: any;
+  };
+};
 
 interface AnalyzerModalProps {
   isOpen: boolean;
@@ -33,8 +61,12 @@ export default function AnalyzerModal({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pipelineStage, setPipelineStage] = useState<PipelineStage>("idle");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userPrompt, setUserPrompt] = useState("Analyze this food");
+  const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -106,11 +138,63 @@ export default function AnalyzerModal({
     return new File([byteArray], filename, { type: mimeType });
   };
 
+  const buildFormData = (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    // Health flags: will be overridden downstream with real profile, kept for compatibility
+    formData.append("diabetes", "true");
+    formData.append("hypertension", "false");
+    formData.append("ulcer", "false");
+    formData.append("weight_loss", "false");
+    formData.append("acid_reflux", "false");
+    return formData;
+  };
+
+  const postImage = async (path: string, file: File) => {
+    const formData = buildFormData(file);
+    const url = `${BACKEND_API}${path}`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        mode: "cors",
+        credentials: "omit",
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`${res.status} ${res.statusText}: ${errorText}`);
+      }
+
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.error(`Request failed for ${path}:`, err);
+      throw new Error(err?.message || "Network/CORS error. Please retry.");
+    }
+  };
+
+  const confidenceBadge = (confidence?: number) => {
+    const score = Math.round((confidence ?? 0) * 100);
+    if (score >= 80) return "bg-green-100 text-green-800 border-green-200";
+    if (score >= 50) return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    return "bg-red-100 text-red-800 border-red-200";
+  };
+
+  const asArray = (value: any): string[] => {
+    if (Array.isArray(value)) return value.filter(Boolean).map(String);
+    if (!value) return [];
+    return [String(value)];
+  };
+
   const analyzeAndSend = async () => {
     if (!selectedImage || !userId) return;
 
     setIsAnalyzing(true);
+    setPipelineStage("detecting");
+    setStatusMessage("Detecting food…");
     setError(null);
+    setFinalResult(null);
 
     try {
       let convId = conversationId;
@@ -124,45 +208,45 @@ export default function AnalyzerModal({
         "food-images",
         file,
       );
+      setUploadedImageUrl(imageUrl);
 
-      console.log("Uploaded Image URL:", imageUrl);
-      // Prepare FormData for backend API
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("diabetes", "true"); // Will be overridden in action with real profile
-      formData.append("hypertension", "false");
-      formData.append("ulcer", "false");
-      formData.append("weight_loss", "false");
+      // Step 1: Advanced YOLO + Mistral detection
+      let yoloResult: any = null;
+      try {
+        yoloResult = await postImage("/scan-food-yolo-mistral/", file);
+      } catch (advErr) {
+        console.warn("Advanced detection failed, switching to fallback", advErr);
+      }
+      let detectionResult = yoloResult;
 
-      // Call scan-food API with proper error handling
-      console.log("Calling backend API:", `${BACKEND_API}/scan-food/`);
-      
-      const scanRes = await fetch(`${BACKEND_API}/scan-food/`, {
-        method: "POST",
-        body: formData,
-        mode: "cors",
-        credentials: "omit",
-      });
-
-      console.log("Response status:", scanRes.status);
-
-      if (!scanRes.ok) {
-        const errorText = await scanRes.text();
-        console.error("Backend error:", errorText);
-        throw new Error(`Scan failed: ${scanRes.statusText} - ${errorText}`);
+      // Step 2: Fallback to legacy if nothing found
+      if (!detectionResult?.detected_items?.length) {
+        setStatusMessage("No foods from advanced model — trying fallback detection…");
+        detectionResult = await postImage("/scan-food/", file);
       }
 
-      const scanOutput = await scanRes.json();
-      console.log("Scan Output:", scanOutput);
-      
-      // Check if response has error status
-      if (scanOutput.status === "error") {
-        throw new Error(scanOutput.message || "Analysis failed");
-      }
+      // Step 3: Flagship semantic meal analysis (always)
+      setPipelineStage("analyzing");
+      setStatusMessage("Analyzing meal nutrition…");
+      const flagshipResult = await postImage("/analyze-meal", file);
 
-      // Call new server action for food analysis message
+      const combined: FinalResult = {
+        detected_items: detectionResult?.detected_items || [],
+        meal_summary: flagshipResult?.meal_summary || flagshipResult?.mealSummary || {},
+        recommendations: flagshipResult?.recommendations || {},
+        raw: {
+          yolo: detectionResult,
+          flagship: flagshipResult,
+        },
+      };
+
+      setFinalResult(combined);
+
+      // Step 4: Send to chat with insights
+      setPipelineStage("insights");
+      setStatusMessage("Generating insights…");
       const { assistantResponse } =
-        await sendFoodAnalysisMessage(userId, convId, userPrompt, scanOutput, imageUrl);
+        await sendFoodAnalysisMessage(userId, convId, userPrompt, combined, imageUrl);
 
       const userMessage = `${userPrompt} [Food Image Attached]`;
 
@@ -171,11 +255,16 @@ export default function AnalyzerModal({
       // Reset and close
       resetAnalysis();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Analysis error:", err);
-      setError("Failed to analyze image. Please try again.");
+      const message = err?.message?.toLowerCase().includes("cors")
+        ? "Network/CORS issue. Please retry or check backend URL."
+        : err?.message || "Failed to analyze image. Please try again.";
+      setError(message);
     } finally {
       setIsAnalyzing(false);
+      setPipelineStage("idle");
+      setStatusMessage(null);
     }
   };
 
@@ -184,6 +273,10 @@ export default function AnalyzerModal({
     setShowCamera(false);
     setUserPrompt("Analyze this food");
     setError(null);
+    setFinalResult(null);
+    setPipelineStage("idle");
+    setStatusMessage(null);
+    setUploadedImageUrl(null);
     stopCamera();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -207,7 +300,8 @@ export default function AnalyzerModal({
         <div className="space-y-6">
           {/* Error Display */}
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -342,7 +436,7 @@ export default function AnalyzerModal({
               {isAnalyzing ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing...
+                  {statusMessage || "Analyzing..."}
                 </>
               ) : (
                 <>
@@ -352,6 +446,256 @@ export default function AnalyzerModal({
               )}
             </Button>
           </div>
+
+          {(isAnalyzing || statusMessage) && (
+            <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <Loader2 className="w-5 h-5 animate-spin text-gray-700 mt-0.5" />
+              <div>
+                <p className="font-medium text-gray-900">{statusMessage || "Working..."}</p>
+                <p className="text-sm text-gray-600">
+                  {pipelineStage === "detecting"
+                    ? "Detecting food…"
+                    : pipelineStage === "analyzing"
+                      ? "Analyzing meal nutrition…"
+                      : pipelineStage === "insights"
+                        ? "Generating insights…"
+                        : "Processing…"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {finalResult && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Detections</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Food items & confidence</h3>
+                </div>
+                <Badge variant="secondary">{finalResult.detected_items.length} items</Badge>
+              </div>
+
+              {finalResult.detected_items.length ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {finalResult.detected_items.map((item, idx) => (
+                    <Card key={`${item.name}-${idx}`} className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-base text-gray-900">{item.name || "Unknown item"}</CardTitle>
+                          <Badge className={`border ${confidenceBadge(item.confidence)}`}>
+                            {`${Math.round((item.confidence ?? 0) * 100)}%`}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-500">{item.source || "detection"}</p>
+                      </CardHeader>
+                      <CardContent className="space-y-3 text-sm text-gray-800">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-xs text-gray-500">Calories</p>
+                            <p className="font-semibold">{item.calories ?? "—"} kcal</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-xs text-gray-500">GI</p>
+                            <p className="font-semibold">{item.glycemic_index ?? "—"}</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-xs text-gray-500">Carbs</p>
+                            <p className="font-semibold">{item.carbs ?? "—"} g</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-xs text-gray-500">Protein</p>
+                            <p className="font-semibold">{item.protein ?? "—"} g</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-xs text-gray-500">Fat</p>
+                            <p className="font-semibold">{item.fat ?? "—"} g</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-xs text-gray-500">Fiber</p>
+                            <p className="font-semibold">{item.fiber ?? "—"} g</p>
+                          </div>
+                        </div>
+                        {asArray(item.flags).length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {asArray(item.flags).map((flag, flagIdx) => (
+                              <Badge key={`${flag}-${flagIdx}`} variant="outline">
+                                {flag}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center">
+                  <p className="font-semibold text-gray-900">No foods detected — try another angle or better lighting.</p>
+                  <p className="text-sm text-gray-600">We still ran nutrition analysis; you can retake and retry.</p>
+                  <div className="flex items-center justify-center gap-3">
+                    {selectedImage && (
+                      <img
+                        src={selectedImage}
+                        alt="Scanned preview"
+                        className="h-20 w-20 rounded-md border object-cover"
+                      />
+                    )}
+                    {!selectedImage && uploadedImageUrl && (
+                      <img
+                        src={uploadedImageUrl}
+                        alt="Uploaded preview"
+                        className="h-20 w-20 rounded-md border object-cover"
+                      />
+                    )}
+                  </div>
+                  <Button variant="outline" onClick={resetAnalysis} className="mt-1">
+                    Retake Photo
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Nutrition</p>
+                    <h3 className="text-lg font-semibold text-gray-900">Meal summary</h3>
+                  </div>
+                  {finalResult.meal_summary?.score ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">Quality: {finalResult.meal_summary?.quality || "N/A"}</Badge>
+                      <Badge variant="secondary">Score {Math.round(finalResult.meal_summary.score)}/100</Badge>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Energy & Macros</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm text-gray-800">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs text-gray-500">Calories</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.total_calories ?? "—"} kcal</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Carbs</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.total_carbs ?? "—"} g</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Protein</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.total_protein ?? "—"} g</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Fat</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.total_fat ?? "—"} g</p>
+                        </div>
+                      </div>
+                      {finalResult.meal_summary?.score ? (
+                        <div className="pt-2">
+                          <p className="text-xs text-gray-500 mb-1">Meal score</p>
+                          <Progress value={Number(finalResult.meal_summary.score)} className="h-2" />
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Metabolic Signals</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm text-gray-800">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs text-gray-500">Glycemic Load</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.glycemic_load ?? "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Fiber</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.total_fiber ?? "—"} g</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Sodium</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.total_sodium ?? "—"} mg</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Quality</p>
+                          <p className="font-semibold">{finalResult.meal_summary?.quality ?? "—"}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  <div>
+                    <p className="text-sm text-gray-500">AI Recommendations</p>
+                    <h3 className="text-lg font-semibold text-gray-900">Healthier swaps & portions</h3>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {asArray(finalResult.recommendations?.healthy_alternatives).length ? (
+                    <Card className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Healthy alternatives</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm text-gray-800">
+                        {asArray(finalResult.recommendations?.healthy_alternatives).map((alt, idx) => (
+                          <div key={`alt-${idx}`} className="flex items-start gap-2">
+                            <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span>
+                            <span>{alt}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  {asArray(finalResult.recommendations?.portion_adjustments).length ? (
+                    <Card className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Portion guidance</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm text-gray-800">
+                        {asArray(finalResult.recommendations?.portion_adjustments).map((alt, idx) => (
+                          <div key={`portion-${idx}`} className="flex items-start gap-2">
+                            <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                            <span>{alt}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  {asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).length ? (
+                    <Card className="shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">What to add</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm text-gray-800">
+                        {asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).map((alt, idx) => (
+                          <div key={`add-${idx}`} className="flex items-start gap-2">
+                            <span className="mt-1 h-2 w-2 rounded-full bg-amber-500"></span>
+                            <span>{alt}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  {(!asArray(finalResult.recommendations?.healthy_alternatives).length &&
+                    !asArray(finalResult.recommendations?.portion_adjustments).length &&
+                    !asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).length) && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                        Recommendations will appear here once the analysis completes.
+                      </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
