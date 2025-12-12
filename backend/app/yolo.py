@@ -62,7 +62,8 @@ class YOLOFoodDetector:
         self,
         image: Image.Image,
         confidence_threshold: float = 0.25,
-        iou_threshold: float = 0.45
+        iou_threshold: float = 0.45,
+        imgsz: int = 320
     ) -> List[Dict[str, Any]]:
        
         try:
@@ -76,6 +77,7 @@ class YOLOFoodDetector:
                 img_array,
                 conf=confidence_threshold,
                 iou=iou_threshold,
+                imgsz=imgsz,
                 verbose=False
             )
             

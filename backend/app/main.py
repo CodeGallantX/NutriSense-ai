@@ -290,6 +290,16 @@ def get_yolo_detector():
             raise
     return _yolo_detector
 
+# Preload models on startup for Render stability
+@app.on_event("startup")
+def preload_models():
+    try:
+        logger.info("Startup: Preloading YOLO model...")
+        get_yolo_detector()
+        logger.info("Startup: Models ready")
+    except Exception as e:
+        logger.error(f"Startup: Model preload failed: {e}")
+
 # TODO: Re-enable DeepSeek integration when needed
 # def get_deepseek_detector():
 #     """Get or initialize DeepSeek-VL2 detector for /scan-food endpoint."""
@@ -987,7 +997,7 @@ async def scan_food_yolo_mistral(
         # Step 1: YOLO Detection
         logger.info("Step 1: Running YOLO detection...")
         yolo_detector = get_yolo_detector()
-        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25)
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=320)
         logger.info(f"YOLO detected {len(yolo_results)} items")
         
         # Step 2: Mistral Validation (optional - graceful fallback)
@@ -1051,28 +1061,29 @@ async def scan_food_yolo_mistral(
         )
         
         # Build response
-        response = ScanFoodResponse(
-            detected_items=[ScanFoodItem(**item) for item in enriched_items],
-            meal_summary=ScanMealSummary(**meal_summary),
-            recommendations=ScanMealRecommendations(**recommendations),
-            fusion_stats=fusion_stats
-        )
-        
+        response = {
+            "detected_items": [ScanFoodItem(**item).model_dump() for item in enriched_items],
+            "meal_summary": ScanMealSummary(**meal_summary).model_dump(),
+            "recommendations": ScanMealRecommendations(**recommendations).model_dump(),
+            "fusion_stats": fusion_stats,
+            "status": "success",
+        }
         logger.info("Food detection complete!")
         return response
         
-    except HTTPException:
-        raise
+    except HTTPException as e:
+        logger.error(f"HTTP error during food detection: {e}")
+        return {"detected_items": [], "meal_summary": {}, "recommendations": {}, "status": "error", "message": str(e.detail) if hasattr(e, 'detail') else str(e)}
     except Exception as e:
         logger.error(f"Unexpected error during food detection: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        return {"detected_items": [], "meal_summary": {}, "recommendations": {}, "status": "error", "message": str(e)}
 
 
 @app.post(
     "/scan-food/",
     tags=["Food Detection"],
     summary="Basic Food Analysis (Legacy)",
-    response_model=MealAnalysisResponse,
+    response_model=None,
     responses={
         200: {"description": "Successful meal analysis with nutrition and recommendations"},
         400: {"description": "Invalid image format or request"},
@@ -1138,11 +1149,34 @@ async def scan_food(
         "weight_loss": weight_loss
     }
     
-    img = Image.open(BytesIO(await file.read()))
-    foods = analyze_image(img, user_health)
-    foods = apply_missing_ingredient_heuristics(foods)
-    result = build_meal_analysis(foods, user_health)
-    return result
+    try:
+        image_bytes = await file.read()
+        image = Image.open(BytesIO(image_bytes))
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        logger.info(f"Legacy /scan-food: image {image.size} mode {image.mode}")
+
+        # Use new pipeline but keep legacy route
+        yolo_detector = get_yolo_detector()
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=320)
+
+        fusion_engine = get_fusion_engine()
+        fused_results = fusion_engine.fuse(yolo_results, [])
+
+        heuristics_engine = get_heuristics_engine()
+        enriched_items = [heuristics_engine.enrich_food_item(item) for item in fused_results]
+        meal_summary = heuristics_engine.calculate_meal_summary(enriched_items)
+        recommendations = heuristics_engine.generate_meal_recommendations(enriched_items, meal_summary)
+
+        return {
+            "detected_items": enriched_items,
+            "meal_summary": meal_summary,
+            "recommendations": recommendations,
+            "status": "success",
+        }
+    except Exception as e:
+        logger.error(f"Legacy /scan-food error: {e}", exc_info=True)
+        return {"detected_items": [], "meal_summary": {}, "recommendations": {}, "status": "error", "message": str(e)}
 
 
 @app.post(
