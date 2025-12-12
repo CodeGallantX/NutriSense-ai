@@ -1,62 +1,142 @@
 {
   "Aganyi Beans": {
-    "calories": 347
+    "calories": 347,
+    "carbs": 63,
+    "protein": 21,
+    "fat": 1.5,
+    "fiber": 15
   },
   "Aganyi Stew": {
-    "calories": 120
+    "calories": 120,
+    "carbs": 8,
+    "protein": 6,
+    "fat": 7,
+    "fiber": 2
   },
   "Jollof Rice": {
-    "calories": 180
+    "calories": 180,
+    "carbs": 35,
+    "protein": 4,
+    "fat": 3,
+    "fiber": 1
   },
   "Fried Plantain": {
-    "calories": 239
+    "calories": 239,
+    "carbs": 48,
+    "protein": 2,
+    "fat": 8,
+    "fiber": 3
   },
   "Moi Moi": {
-    "calories": 151
+    "calories": 151,
+    "carbs": 15,
+    "protein": 12,
+    "fat": 5,
+    "fiber": 4
   },
   "Efo Riro": {
-    "calories": 100
+    "calories": 100,
+    "carbs": 6,
+    "protein": 5,
+    "fat": 6,
+    "fiber": 3
   },
   "Pounded Yam": {
-    "calories": 330
+    "calories": 330,
+    "carbs": 79,
+    "protein": 3,
+    "fat": 0.3,
+    "fiber": 4
   },
   "Egusi Soup": {
-    "calories": 180
+    "calories": 180,
+    "carbs": 8,
+    "protein": 10,
+    "fat": 12,
+    "fiber": 5
   },
   "Steamed Fish": {
-    "calories": 130
+    "calories": 130,
+    "carbs": 0,
+    "protein": 26,
+    "fat": 3,
+    "fiber": 0
   },
   "Fried Chicken": {
-    "calories": 239
+    "calories": 239,
+    "carbs": 8,
+    "protein": 27,
+    "fat": 11,
+    "fiber": 0
   },
   "Vegetable Salad": {
-    "calories": 50
+    "calories": 50,
+    "carbs": 10,
+    "protein": 2,
+    "fat": 0.5,
+    "fiber": 3
   },
   "Ogi": {
-    "calories": 68
+    "calories": 68,
+    "carbs": 15,
+    "protein": 1,
+    "fat": 0.2,
+    "fiber": 1
   },
   "Yam Porridge": {
-    "calories": 140
+    "calories": 140,
+    "carbs": 27,
+    "protein": 3,
+    "fat": 2,
+    "fiber": 4
   },
   "Okra Soup": {
-    "calories": 120
+    "calories": 120,
+    "carbs": 10,
+    "protein": 7,
+    "fat": 6,
+    "fiber": 5
   },
   "Rice and Beans": {
-    "calories": 180
+    "calories": 180,
+    "carbs": 32,
+    "protein": 8,
+    "fat": 1.5,
+    "fiber": 6
   },
   "Boli (Roasted Plantain)": {
-    "calories": 200
+    "calories": 200,
+    "carbs": 47,
+    "protein": 2,
+    "fat": 0.5,
+    "fiber": 3
   },
   "Ewedu Soup": {
-    "calories": 90
+    "calories": 90,
+    "carbs": 8,
+    "protein": 4,
+    "fat": 4,
+    "fiber": 4
   },
   "Pepper Soup": {
-    "calories": 50
+    "calories": 50,
+    "carbs": 3,
+    "protein": 8,
+    "fat": 1,
+    "fiber": 1
   },
   "Fufu": {
-    "calories": 330
+    "calories": 330,
+    "carbs": 81,
+    "protein": 2,
+    "fat": 0.2,
+    "fiber": 2
   },
   "Stew": {
-    "calories": 110
+    "calories": 110,
+    "carbs": 9,
+    "protein": 5,
+    "fat": 6,
+    "fiber": 2
   }
 }
