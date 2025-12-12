@@ -1088,7 +1088,6 @@ async def scan_food_yolo_mistral(
     "/scan-food/",
     tags=["Food Detection"],
     summary="Basic Food Analysis (Legacy)",
-    response_model=None,
     responses={
         200: {"description": "Successful meal analysis with nutrition and recommendations"},
         400: {"description": "Invalid image format or request"},
@@ -1188,7 +1187,6 @@ async def scan_food(
     "/analyze-meal",
     tags=["Food Detection"],
     summary="Flagship Meal Analysis (Comprehensive)",
-    response_model=MealAnalysisResponse,
     responses={
         200: {"description": "Comprehensive meal analysis with all health conditions"},
         400: {"description": "Invalid image or request parameters"},
