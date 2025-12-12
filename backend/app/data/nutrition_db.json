@@ -4,139 +4,299 @@
     "carbs": 63,
     "protein": 21,
     "fat": 1.5,
-    "fiber": 15
+    "fiber": 15,
+    "flags": ["fiber-rich"],
+    "warnings": {
+      "ulcer": "Generally safe; not spicy.",
+      "acid_reflux": "Low fat; generally safe.",
+      "hypertension": "Low sodium unless salted.",
+      "diabetes": "Low GI legume; good option.",
+      "cholesterol": "Low fat/zero cholesterol."
+    }
   },
   "Aganyi Stew": {
     "calories": 120,
     "carbs": 8,
     "protein": 6,
     "fat": 7,
-    "fiber": 2
+    "fiber": 2,
+    "flags": ["stew", "spicy"],
+    "warnings": {
+      "ulcer": "May be spicy; can irritate.",
+      "acid_reflux": "Tomato/spice may trigger reflux.",
+      "hypertension": "Watch added salt/oil.",
+      "diabetes": "Moderate carbs; pair with fiber.",
+      "cholesterol": "Low cholesterol unless fatty meat added."
+    }
   },
   "Jollof Rice": {
     "calories": 180,
     "carbs": 35,
     "protein": 4,
     "fat": 3,
-    "fiber": 1
+    "fiber": 1,
+    "flags": ["carb-heavy", "starchy"],
+    "warnings": {
+      "ulcer": "Spice/pepper may irritate.",
+      "acid_reflux": "Tomato/spice may trigger.",
+      "hypertension": "Watch salt/oil.",
+      "diabetes": "High GI; portion control.",
+      "cholesterol": "Low cholesterol unless oily."
+    }
   },
   "Fried Plantain": {
     "calories": 239,
     "carbs": 48,
     "protein": 2,
     "fat": 8,
-    "fiber": 3
+    "fiber": 3,
+    "flags": ["fried", "sweet", "starchy"],
+    "warnings": {
+      "ulcer": "Fried; could irritate if spicy oil.",
+      "acid_reflux": "Fried; may trigger reflux.",
+      "hypertension": "Limit if salted/fried.",
+      "diabetes": "Moderate GI; watch portion.",
+      "cholesterol": "Frying oil adds fat."
+    }
   },
   "Moi Moi": {
     "calories": 151,
     "carbs": 15,
     "protein": 12,
     "fat": 5,
-    "fiber": 4
+    "fiber": 4,
+    "flags": ["steamed", "protein-rich", "fiber-rich"],
+    "warnings": {
+      "ulcer": "Generally gentle; low spice if prepared mild.",
+      "acid_reflux": "Low fat; usually safe.",
+      "hypertension": "Watch added salt.",
+      "diabetes": "Low-moderate GI; good protein.",
+      "cholesterol": "Low unless extra oil added."
+    }
   },
   "Efo Riro": {
     "calories": 100,
     "carbs": 6,
     "protein": 5,
     "fat": 6,
-    "fiber": 3
+    "fiber": 3,
+    "flags": ["vegetable", "fiber-rich"],
+    "warnings": {
+      "ulcer": "Pepper can irritate if spicy.",
+      "acid_reflux": "Spice/oil may trigger.",
+      "hypertension": "Watch seasoning salt.",
+      "diabetes": "Low GI vegetable; good.",
+      "cholesterol": "Low unless cooked with palm oil."
+    }
   },
   "Pounded Yam": {
     "calories": 330,
     "carbs": 79,
     "protein": 3,
     "fat": 0.3,
-    "fiber": 4
+    "fiber": 4,
+    "flags": ["carb-heavy", "starchy"],
+    "warnings": {
+      "ulcer": "Neutral unless eaten with spicy soup.",
+      "acid_reflux": "Neutral base.",
+      "hypertension": "Usually low sodium.",
+      "diabetes": "High GI; strong portion control.",
+      "cholesterol": "Very low fat."
+    }
   },
   "Egusi Soup": {
     "calories": 180,
     "carbs": 8,
     "protein": 10,
     "fat": 12,
-    "fiber": 5
+    "fiber": 5,
+    "flags": ["soup", "nutty", "fatty"],
+    "warnings": {
+      "ulcer": "Pepper/spice may irritate.",
+      "acid_reflux": "Fat/spice can trigger.",
+      "hypertension": "Watch palm oil/salt.",
+      "diabetes": "Low GI; moderate fat.",
+      "cholesterol": "High fat if palm oil/meat used."
+    }
   },
   "Steamed Fish": {
     "calories": 130,
     "carbs": 0,
     "protein": 26,
     "fat": 3,
-    "fiber": 0
+    "fiber": 0,
+    "flags": ["protein-rich", "lean"],
+    "warnings": {
+      "ulcer": "Generally safe.",
+      "acid_reflux": "Lean; safe.",
+      "hypertension": "Low sodium if not salted.",
+      "diabetes": "Zero carbs; good choice.",
+      "cholesterol": "Lean protein."
+    }
   },
   "Fried Chicken": {
     "calories": 239,
     "carbs": 8,
     "protein": 27,
     "fat": 11,
-    "fiber": 0
+    "fiber": 0,
+    "flags": ["fried", "protein-rich", "salty"],
+    "warnings": {
+      "ulcer": "Fried; may irritate.",
+      "acid_reflux": "Fried/fatty; can trigger.",
+      "hypertension": "Often salty; limit.",
+      "diabetes": "Low carb; watch breading/oil.",
+      "cholesterol": "Higher fat; limit for cholesterol."
+    }
   },
   "Vegetable Salad": {
     "calories": 50,
     "carbs": 10,
     "protein": 2,
     "fat": 0.5,
-    "fiber": 3
+    "fiber": 3,
+    "flags": ["vegetable", "fiber-rich", "low-cal"],
+    "warnings": {
+      "ulcer": "Raw veggies usually safe; avoid spicy dressing.",
+      "acid_reflux": "Safe unless acidic dressing.",
+      "hypertension": "Safe unless salty dressing.",
+      "diabetes": "Low GI; helpful.",
+      "cholesterol": "Very low fat."
+    }
   },
   "Ogi": {
     "calories": 68,
     "carbs": 15,
     "protein": 1,
     "fat": 0.2,
-    "fiber": 1
+    "fiber": 1,
+    "flags": ["carb-heavy", "porridge"],
+    "warnings": {
+      "ulcer": "Usually mild; ok.",
+      "acid_reflux": "Mild; low fat.",
+      "hypertension": "Low sodium.",
+      "diabetes": "Medium GI; watch portion.",
+      "cholesterol": "Very low fat."
+    }
   },
   "Yam Porridge": {
     "calories": 140,
     "carbs": 27,
     "protein": 3,
     "fat": 2,
-    "fiber": 4
+    "fiber": 4,
+    "flags": ["starchy", "stew"],
+    "warnings": {
+      "ulcer": "Spice may irritate.",
+      "acid_reflux": "Spice can trigger.",
+      "hypertension": "Watch salt/oil.",
+      "diabetes": "High GI carb; portion control.",
+      "cholesterol": "Low fat unless oily."
+    }
   },
   "Okra Soup": {
     "calories": 120,
     "carbs": 10,
     "protein": 7,
     "fat": 6,
-    "fiber": 5
+    "fiber": 5,
+    "flags": ["soup", "fiber-rich"],
+    "warnings": {
+      "ulcer": "Generally gentle; mild spice preferred.",
+      "acid_reflux": "Low acid; usually safe.",
+      "hypertension": "Watch salt/oil.",
+      "diabetes": "Low GI; good fiber.",
+      "cholesterol": "Low unless oily."
+    }
   },
   "Rice and Beans": {
     "calories": 180,
     "carbs": 32,
     "protein": 8,
     "fat": 1.5,
-    "fiber": 6
+    "fiber": 6,
+    "flags": ["carb+protein", "fiber-rich"],
+    "warnings": {
+      "ulcer": "Mild unless spicy sauce.",
+      "acid_reflux": "Neutral unless tomato/spice.",
+      "hypertension": "Watch salt.",
+      "diabetes": "Moderate GI; balanced with beans.",
+      "cholesterol": "Low fat."
+    }
   },
   "Boli (Roasted Plantain)": {
     "calories": 200,
     "carbs": 47,
     "protein": 2,
     "fat": 0.5,
-    "fiber": 3
+    "fiber": 3,
+    "flags": ["roasted", "sweet", "starchy"],
+    "warnings": {
+      "ulcer": "Usually mild.",
+      "acid_reflux": "Low fat; ok.",
+      "hypertension": "Low sodium unless salted.",
+      "diabetes": "Moderate GI; portion control.",
+      "cholesterol": "Very low fat."
+    }
   },
   "Ewedu Soup": {
     "calories": 90,
     "carbs": 8,
     "protein": 4,
     "fat": 4,
-    "fiber": 4
+    "fiber": 4,
+    "flags": ["soup", "vegetable"],
+    "warnings": {
+      "ulcer": "Generally soothing; low spice.",
+      "acid_reflux": "Low acid; safe.",
+      "hypertension": "Low sodium unless salted.",
+      "diabetes": "Low GI; helpful.",
+      "cholesterol": "Low fat."
+    }
   },
   "Pepper Soup": {
     "calories": 50,
     "carbs": 3,
     "protein": 8,
     "fat": 1,
-    "fiber": 1
+    "fiber": 1,
+    "flags": ["soup", "spicy"],
+    "warnings": {
+      "ulcer": "Spicy; likely irritating.",
+      "acid_reflux": "High spice; can trigger.",
+      "hypertension": "Watch salt.",
+      "diabetes": "Low carb; fine.",
+      "cholesterol": "Low fat."
+    }
   },
   "Fufu": {
     "calories": 330,
     "carbs": 81,
     "protein": 2,
     "fat": 0.2,
-    "fiber": 2
+    "fiber": 2,
+    "flags": ["carb-heavy", "starchy"],
+    "warnings": {
+      "ulcer": "Neutral base; ok.",
+      "acid_reflux": "Neutral.",
+      "hypertension": "Low sodium.",
+      "diabetes": "High GI; strong portion control.",
+      "cholesterol": "Very low fat."
+    }
   },
   "Stew": {
     "calories": 110,
     "carbs": 9,
     "protein": 5,
     "fat": 6,
-    "fiber": 2
+    "fiber": 2,
+    "flags": ["stew", "spicy"],
+    "warnings": {
+      "ulcer": "Spice may irritate.",
+      "acid_reflux": "Tomato/spice may trigger.",
+      "hypertension": "Watch salt/oil.",
+      "diabetes": "Moderate carbs.",
+      "cholesterol": "Moderate fat depending on oil."
+    }
   }
 }

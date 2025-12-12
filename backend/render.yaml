@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: nutrisense-api
+    env: python
+    plan: starter
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: HF_TOKEN
+        fromService: secret
+      - key: YOLO_CONFIG_DIR
+        value: "/tmp/Ultralytics"
+      # - key: DATABASE_URL
+      #   value: "No database used currently"

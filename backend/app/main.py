@@ -58,6 +58,8 @@ def get_food_info(food_name: str, confidence: float):
     fat = nutrition.get("fat")
     fiber = nutrition.get("fiber")
     gi = gi_db.get(food_name)
+    flags = nutrition.get("flags", [])
+    health_warnings = nutrition.get("warnings", {})
     
     # Basic advice based on GI
     if gi is None:
@@ -78,7 +80,9 @@ def get_food_info(food_name: str, confidence: float):
         "fat": fat,
         "fiber": fiber,
         "glycemic_index": gi,
-        "advice": advice
+        "advice": advice,
+        "flags": flags,
+        "health_warnings": health_warnings
     }
 
 def _estimate_portion(mask_area: float, food_name: str) -> float:
@@ -86,6 +90,22 @@ def _estimate_portion(mask_area: float, food_name: str) -> float:
     ref_area = 4000
     portion = max(0.3, min(2.0, mask_area / ref_area))
     return portion
+
+def _apply_flag_heuristics(info: dict) -> dict:
+    name_lower = info.get("name", "").lower()
+    flags = set(info.get("flags", []))
+    if "fried" in name_lower:
+        flags.add("fried")
+    if "pepper" in name_lower or "spicy" in name_lower:
+        flags.add("spicy")
+    if "soup" in name_lower:
+        flags.add("soup")
+    if "stew" in name_lower:
+        flags.add("stew")
+    if "rice" in name_lower or "yam" in name_lower or "fufu" in name_lower or "plantain" in name_lower:
+        flags.add("carb-heavy")
+    info["flags"] = list(flags)
+    return info
 
 def _apply_portion_scaling(info: dict, portion: float) -> dict:
     scaled = info.copy()
@@ -98,6 +118,7 @@ def _handle_detection(results_dict: dict, food_name: str, conf_val: float, user_
     info = get_food_info(food_name, conf_val)
     if portion is not None:
         info = _apply_portion_scaling(info, portion)
+    info = _apply_flag_heuristics(info)
     info["advice"] = personalize_advice(info, user_health)
     return info
 
@@ -160,6 +181,9 @@ def analyze_image(img: Image.Image, user_health: dict):
 def personalize_advice(food_info: dict, user_health: dict):
     advice = food_info.get("advice", "")
     warnings = []
+    name_lower = food_info.get("name", "").lower()
+    flags = set(food_info.get("flags", []))
+    health_warnings = food_info.get("health_warnings", {})
     
     # Diabetes warnings
     gi = food_info.get("glycemic_index")
@@ -169,6 +193,8 @@ def personalize_advice(food_info: dict, user_health: dict):
             warnings.append("⚠️ High GI - limit intake for diabetes")
         if carbs and carbs > 30:
             warnings.append("⚠️ High carbs - monitor blood sugar")
+        if health_warnings.get("diabetes"):
+            warnings.append(health_warnings["diabetes"])
     
     # Hypertension warnings
     food_lower = food_info.get("name", "").lower()
@@ -176,12 +202,23 @@ def personalize_advice(food_info: dict, user_health: dict):
         high_sodium_foods = ["fried chicken", "stew", "pepper soup", "jollof rice"]
         if any(food in food_lower for food in high_sodium_foods):
             warnings.append("⚠️ May be high in sodium - limit for hypertension")
+        if health_warnings.get("hypertension"):
+            warnings.append(health_warnings["hypertension"])
     
     # Ulcer warnings
     if user_health.get("ulcer"):
         irritating_foods = ["pepper soup", "fried", "stew"]
         if any(food in food_lower for food in irritating_foods):
             warnings.append("⚠️ May irritate ulcers - consume with caution")
+        if health_warnings.get("ulcer"):
+            warnings.append(health_warnings["ulcer"])
+
+    # Acid reflux / GERD
+    if user_health.get("acid_reflux"):
+        if any(flag in flags for flag in ["fried", "spicy", "acidic"]):
+            warnings.append("⚠️ May trigger reflux")
+        if health_warnings.get("acid_reflux"):
+            warnings.append(health_warnings["acid_reflux"])
     
     # Weight management
     calories = food_info.get("calories")
@@ -221,79 +258,111 @@ def calculate_meal_totals(foods: list) -> dict:
     
     return totals
 
-def get_meal_score(totals: dict, user_health: dict) -> dict:
-    """Score the meal balance and provide recommendations"""
-    score = 100
+def _component_scores(foods: List[Dict[str, Any]], totals: dict, user_health: dict) -> Dict[str, float]:
+    unique_foods = len({f.get("name") for f in foods})
+    diversity = min(100.0, unique_foods * 15)
+
+    # Nutrient completeness: presence of protein, fiber, and balanced macros
+    completeness = 50.0
+    if totals["total_protein"] >= 20:
+        completeness += 20
+    if totals["total_fiber"] >= 8:
+        completeness += 20
+    if 30 <= totals["total_carbs"] <= 70:
+        completeness += 10
+
+    # Glycemic load score (lower GL is better)
+    gl = totals["glycemic_load"]
+    if gl <= 10:
+        gl_score = 100
+    elif gl <= 20:
+        gl_score = 70
+    elif gl <= 30:
+        gl_score = 40
+    else:
+        gl_score = 20
+
+    # Fiber adequacy
+    fiber_score = 100 if totals["total_fiber"] >= 10 else (70 if totals["total_fiber"] >= 5 else 40)
+
+    # Protein adequacy
+    protein_score = 100 if totals["total_protein"] >= 25 else (70 if totals["total_protein"] >= 15 else 40)
+
+    # Fat quality: penalize fried/fatty flags
+    fried_count = sum(1 for f in foods if "fried" in f.get("flags", []))
+    fat_score = max(40.0, 100 - fried_count * 15)
+
+    # Sodium/processed penalty: rough proxy via salty/stew/fried flags
+    sodium_penalty = sum(1 for f in foods if any(flag in f.get("flags", []) for flag in ["salty", "stew", "fried"])) * 10
+    sodium_score = max(40.0, 100 - sodium_penalty)
+
+    # Diabetes-friendly score (based on GL and flags)
+    high_gi_flags = any("carb-heavy" in f.get("flags", []) for f in foods)
+    if gl <= 12 and not high_gi_flags:
+        diabetes_score = 100
+    elif gl <= 20:
+        diabetes_score = 75
+    else:
+        diabetes_score = 45
+
+    return {
+        "meal_diversity": diversity,
+        "nutrient_completeness": completeness,
+        "glycemic_load_score": gl_score,
+        "fiber_adequacy": fiber_score,
+        "protein_adequacy": protein_score,
+        "fat_quality": fat_score,
+        "sodium_penalty": sodium_score,
+        "diabetes_friendly": diabetes_score
+    }
+
+
+def get_meal_score(foods: List[Dict[str, Any]], totals: dict, user_health: dict) -> dict:
+    """Score the meal balance and provide recommendations using multiple components."""
+    components = _component_scores(foods, totals, user_health)
+
+    # Weighted composite
+    score = (
+        components["meal_diversity"] * 0.10 +
+        components["nutrient_completeness"] * 0.20 +
+        components["glycemic_load_score"] * 0.20 +
+        components["fiber_adequacy"] * 0.15 +
+        components["protein_adequacy"] * 0.15 +
+        components["fat_quality"] * 0.10 +
+        components["sodium_penalty"] * 0.05 +
+        components["diabetes_friendly"] * 0.05
+    )
+
     recommendations = []
     warnings = []
-    
-    total_macros = totals["total_protein"] + totals["total_carbs"] + totals["total_fat"]
-    
-    if total_macros > 0:
-        protein_pct = (totals["total_protein"] * 4 / (total_macros * 4)) * 100  # 4 cal/g
-        carbs_pct = (totals["total_carbs"] * 4 / (total_macros * 4)) * 100
-        fat_pct = (totals["total_fat"] * 9 / ((total_macros * 4) + (totals["total_fat"] * 5))) * 100  # 9 cal/g
-        
-        # Balanced meal targets: 30% protein, 40% carbs, 30% fat
-        if protein_pct < 20:
-            score -= 15
-            recommendations.append("Add more protein (fish, chicken, beans)")
-        elif protein_pct > 40:
-            score -= 5
-            warnings.append("High protein content")
-        
-        if carbs_pct > 60:
-            score -= 20
-            recommendations.append("Reduce carbs or add more vegetables")
-        elif carbs_pct < 30:
-            recommendations.append("Consider adding complex carbs for energy")
-        
-        if fat_pct > 40:
-            score -= 10
-            recommendations.append("High fat content - consider grilling instead of frying")
-    
-    # Fiber check
-    if totals["total_fiber"] < 5:
-        score -= 10
-        recommendations.append("Add more fiber (vegetables, beans)")
-    
-    # Glycemic load assessment
-    gl = totals["glycemic_load"]
-    if gl > 20:
-        warnings.append("⚠️ High glycemic load - may spike blood sugar")
-        score -= 15
-    elif gl > 10:
-        warnings.append("ℹ️ Moderate glycemic load")
-        score -= 5
-    
-    # Health-specific scoring
-    if user_health.get("diabetes"):
-        if totals["total_carbs"] > 45:
-            score -= 20
-            warnings.append("⚠️ Very high carbs for diabetes management")
-        if totals["total_fiber"] < 8:
-            score -= 10
-            recommendations.append("Add high-fiber foods to slow glucose absorption")
-    
-    if user_health.get("hypertension"):
-        recommendations.append("Choose low-sodium preparation methods")
-    
-    # Ensure score doesn't go below 0
-    score = max(0, score)
-    
-    # Determine meal quality
-    if score >= 80:
+
+    if components["fiber_adequacy"] < 70:
+        recommendations.append("Add vegetables/beans for fiber")
+    if components["protein_adequacy"] < 70:
+        recommendations.append("Add lean protein (fish, beans, chicken)")
+    if components["glycemic_load_score"] < 70:
+        warnings.append("⚠️ High glycemic load - add protein/fiber and reduce carbs")
+    if components["fat_quality"] < 70:
+        recommendations.append("Reduce fried items; prefer grilling/steaming")
+    if components["sodium_penalty"] < 70:
+        recommendations.append("Reduce salty/processed sauces and seasonings")
+
+    # Quality buckets
+    if score >= 85:
         quality = "Excellent"
-    elif score >= 60:
+    elif score >= 70:
         quality = "Good"
-    elif score >= 40:
+    elif score >= 50:
         quality = "Fair"
+    elif score >= 30:
+        quality = "Risky"
     else:
-        quality = "Needs Improvement"
-    
+        quality = "Dangerous"
+
     return {
-        "score": score,
+        "score": round(score, 1),
         "quality": quality,
+        "components": components,
         "recommendations": recommendations,
         "warnings": warnings
     }
@@ -341,6 +410,51 @@ def apply_missing_ingredient_heuristics(foods: List[Dict[str, Any]]) -> List[Dic
 
     return foods + additions
 
+
+def build_recommendations(foods: List[Dict[str, Any]], totals: dict) -> Dict[str, List[str]]:
+    healthy_alternatives = []
+    portion_adjustments = []
+    additions = []
+
+    for food in foods:
+        flags = set(food.get("flags", []))
+        name = food.get("name", "")
+        if "fried" in flags:
+            healthy_alternatives.append(f"Swap {name} -> grilled/roasted version")
+        if "sweet" in flags:
+            healthy_alternatives.append(f"Reduce added sugar; consider unsweetened options for {name}")
+        if "carb-heavy" in flags:
+            portion_adjustments.append(f"Reduce portion of {name}; pair with protein/fiber")
+        if "spicy" in flags:
+            healthy_alternatives.append(f"Use mild/spice-free preparation for {name}")
+
+    if totals.get("total_carbs", 0) > 60:
+        portion_adjustments.append("Reduce high-GI carbs; add protein to stabilize blood sugar")
+    if totals.get("total_protein", 0) < 20:
+        additions.append("Add lean protein (fish, chicken, beans)")
+    if totals.get("total_fiber", 0) < 8:
+        additions.append("Add vegetables/beans to boost fiber")
+
+    return {
+        "healthy_alternatives": healthy_alternatives,
+        "portion_adjustments": portion_adjustments,
+        "additions": additions
+    }
+
+
+def build_meal_analysis(foods: List[Dict[str, Any]], user_health: dict) -> dict:
+    meal_totals = calculate_meal_totals(foods)
+    meal_score = get_meal_score(foods, meal_totals, user_health)
+    recs = build_recommendations(foods, meal_totals)
+    return {
+        "detected_items": foods,
+        "meal_summary": {
+            **meal_totals,
+            **meal_score
+        },
+        "recommendations": recs
+    }
+
 # API Endpoints
 @app.get("/")
 def root():
@@ -382,20 +496,35 @@ async def scan_food(
     img = Image.open(BytesIO(await file.read()))
     foods = analyze_image(img, user_health)
     foods = apply_missing_ingredient_heuristics(foods)
-    
-    # Calculate meal-level nutrition
-    meal_totals = calculate_meal_totals(foods)
-    
-    # Get meal score and recommendations
-    meal_analysis = get_meal_score(meal_totals, user_health)
-    
-    return {
-        "detected_items": foods,
-        "meal_summary": {
-            **meal_totals,
-            **meal_analysis
-        }
+    result = build_meal_analysis(foods, user_health)
+    return result
+
+
+@app.post("/analyze-meal")
+async def analyze_meal(
+    file: UploadFile = File(...),
+    diabetes: bool = Form(False),
+    hypertension: bool = Form(False),
+    ulcer: bool = Form(False),
+    weight_loss: bool = Form(False),
+    acid_reflux: bool = Form(False)
+):
+    """
+    Flagship endpoint: combined detection, nutrition, GI, scoring, recommendations.
+    Returns per-item nutrition, GI, per-food flags, meal-level scores, and suggestions.
+    """
+    user_health = {
+        "diabetes": diabetes,
+        "hypertension": hypertension,
+        "ulcer": ulcer,
+        "weight_loss": weight_loss,
+        "acid_reflux": acid_reflux
     }
+    img = Image.open(BytesIO(await file.read()))
+    foods = analyze_image(img, user_health)
+    foods = apply_missing_ingredient_heuristics(foods)
+    result = build_meal_analysis(foods, user_health)
+    return result
 
 
 @app.post("/confirm-detections/")
