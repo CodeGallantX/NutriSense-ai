@@ -42,6 +42,7 @@ class YOLOFoodDetector:
             # Load class names if available
             yaml_path = self.model_path.parent / "chownet_data.yaml"
             self.class_names = self._load_class_names(yaml_path)
+            logger.info(f"YOLO class names loaded: {len(self.class_names)} classes")
             
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
