@@ -1,5 +1,6 @@
 from ultralytics import YOLO
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from io import BytesIO
 from PIL import Image
 from pathlib import Path
@@ -11,9 +12,15 @@ from pydantic import BaseModel, Field
 from app.services.classification_service import classify_food
 import logging
 
-# Import new modules for YOLO + DeepSeek + Heuristics
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
+# Import new modules for YOLO + Mistral + Heuristics
 from app.yolo import YOLOFoodDetector
-from app.deepseek import DeepSeekFoodDetector
+# TODO: Re-enable DeepSeek integration when needed
+# from app.deepseek import DeepSeekFoodDetector
+from app.mistral import MistralFoodValidator
 from app.fusion import DetectionFusion
 from app.heuristics import FoodHeuristics
 from app.scan_models import (
@@ -217,11 +224,12 @@ app = FastAPI(
                "• **Multi-Component Scoring** - Diversity, completeness, GL, fiber, protein, fat quality, sodium\n"
                "• **Hierarchical Analysis** - Primary detection + hierarchical classification + heuristics\n\n"
                "**Supported Conditions:**\n"
-               "🩺 Diabetes | 🩺 Hypertension | 🩺 Ulcers | 🩺 Acid Reflux | 🩺 Weight Management",
-    version="2.0",
+               "Diabetes | Hypertension | Ulcers | Acid Reflux | Weight Management",
+    version="1.0",
     contact={
-        "name": "NutriSense Team",
-        "url": "https://github.com/meet-tola/NutriSense-ai"
+        "name": "NutriSense AI",
+        "url": "https://nutri-sense-ai-eight.vercel.app/dashboard",
+        # "url": "https://github.com/meet-tola/NutriSense-ai",
     },
     openapi_tags=[
         {
@@ -239,6 +247,20 @@ app = FastAPI(
     ]
 )
 
+# Configure CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",           
+        "http://localhost:8000",           
+        "https://nutri-sense-ai-eight.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 
 # YOLO models (original implementation)
@@ -247,9 +269,11 @@ YOLO_SEG_PATH = BASE_DIR / "ml_models" / "yolo" / "best-seg.onnx"
 _yolo_model = None
 _yolo_seg_model = None
 
-# New integrated models (YOLO + DeepSeek + Heuristics)
+# New integrated models (YOLO + Mistral + Heuristics)
 _yolo_detector = None
-_deepseek_detector = None
+# TODO: Re-enable DeepSeek integration when needed
+# _deepseek_detector = None
+_mistral_validator = None
 _fusion_engine = None
 _heuristics_engine = None
 
@@ -266,19 +290,34 @@ def get_yolo_detector():
             raise
     return _yolo_detector
 
-def get_deepseek_detector():
-    """Get or initialize DeepSeek-VL2 detector for /scan-food endpoint."""
-    global _deepseek_detector
-    if _deepseek_detector is None:
+# TODO: Re-enable DeepSeek integration when needed
+# def get_deepseek_detector():
+#     """Get or initialize DeepSeek-VL2 detector for /scan-food endpoint."""
+#     global _deepseek_detector
+#     if _deepseek_detector is None:
+#         try:
+#             logger.info("Initializing DeepSeek-VL2 detector...")
+#             _deepseek_detector = DeepSeekFoodDetector()
+#             logger.info("DeepSeek-VL2 detector initialized successfully")
+#         except Exception as e:
+#             logger.error(f"Failed to initialize DeepSeek detector: {e}")
+#             # Don't raise - DeepSeek is optional
+#             _deepseek_detector = None
+#     return _deepseek_detector
+
+def get_mistral_validator():
+    """Get or initialize Mistral food validator."""
+    global _mistral_validator
+    if _mistral_validator is None:
         try:
-            logger.info("Initializing DeepSeek-VL2 detector...")
-            _deepseek_detector = DeepSeekFoodDetector()
-            logger.info("DeepSeek-VL2 detector initialized successfully")
+            logger.info("Initializing Mistral validator...")
+            _mistral_validator = MistralFoodValidator()
+            logger.info("Mistral validator initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize DeepSeek detector: {e}")
-            # Don't raise - DeepSeek is optional
-            _deepseek_detector = None
-    return _deepseek_detector
+            logger.error(f"Failed to initialize Mistral validator: {e}")
+            # Don't raise - Mistral is optional
+            _mistral_validator = None
+    return _mistral_validator
 
 def get_fusion_engine():
     """Get or initialize fusion engine."""
@@ -824,34 +863,59 @@ def health():
     )
 
 
+# Alias with trailing slash to avoid redirects
+@app.get("/health/", tags=["Health"], include_in_schema=False)
+def health_with_slash():
+    return health()
+
+
+# Disabled Deepseek; using Mistral API key. Re-enable DeepSeek endpoint when needed
+# @app.post(
+#     "/scan-food-yolo-deepseek/",
+#     tags=["Food Detection"],
+#     summary="Advanced Food Detection (YOLO + DeepSeek-VL2)",
+#     response_model=ScanFoodResponse,
+#     responses={
+#         200: {"description": "Successful food detection and analysis using YOLO + DeepSeek fusion"},
+#         400: {"description": "Invalid image format"},
+#         404: {"description": "No foods detected in image"},
+#         500: {"description": "Server error during detection or analysis"}
+#     }
+# )
+# async def scan_food_yolo_deepseek(
+#     file: UploadFile = File(..., description="Food image file (JPEG, PNG, etc.)")
+# ):
+#     """DeepSeek endpoint - temporarily disabled"""
+#     pass
+
 @app.post(
-    "/scan-food-yolo-deepseek/",
+    "/scan-food-yolo-mistral/",
     tags=["Food Detection"],
-    summary="Advanced Food Detection (YOLO + DeepSeek-VL2)",
+    summary="Advanced Food Detection (YOLO + Mistral AI)",
     response_model=ScanFoodResponse,
     responses={
-        200: {"description": "Successful food detection and analysis using YOLO + DeepSeek fusion"},
+        200: {"description": "Successful food detection and analysis using YOLO + Mistral fusion"},
         400: {"description": "Invalid image format"},
         404: {"description": "No foods detected in image"},
         500: {"description": "Server error during detection or analysis"}
     }
 )
-async def scan_food_yolo_deepseek(
+async def scan_food_yolo_mistral(
     file: UploadFile = File(..., description="Food image file (JPEG, PNG, etc.)")
 ):
     """
-    **Advanced Food Detection using YOLO + DeepSeek-VL2 with Heuristics**
+    **Advanced Food Detection using YOLO + Mistral AI with Heuristics**
     
     This endpoint implements the fusion strategy:
     - **YOLO** acts as the precise anchor (trusted results)
-    - **DeepSeek-VL2** fills in missing items (gaps only)
+    - **Mistral AI** validates and extends YOLO detections (no hallucinations)
     - **Heuristics** enhance with nutrition, flags, glycemic info
     
     **Detection Strategy:**
     1. Run YOLO detection (high precision, trusted anchor)
-    2. Run DeepSeek-VL2 with strict food detector prompt
-    3. Fuse results: YOLO ∪ (DeepSeek - YOLO)
-    4. Apply heuristics for nutrition data
+    2. Validate with Mistral AI (confirms YOLO items, adds visible missed foods)
+    3. Fuse results: For duplicates, keep higher confidence; add unique items >= 0.3 confidence
+    4. Apply heuristics for nutrition data with defensive defaults
     5. Calculate meal summary and recommendations
     
     **Input:**
@@ -864,7 +928,7 @@ async def scan_food_yolo_deepseek(
         {
           "name": "jollof rice",
           "confidence": 0.87,
-          "source": "yolo",
+          "source": "YOLO",
           "calories": 180,
           "carbs": 35,
           "protein": 4,
@@ -893,15 +957,16 @@ async def scan_food_yolo_deepseek(
       "fusion_stats": {
         "total_items": 3,
         "yolo_items": 2,
-        "deepseek_items": 1
+        "llm_items": 1
       }
     }
     ```
     
     **Benefits:**
-    - Deterministic (no hallucinations)
-    - YOLO precision + DeepSeek coverage
+    - Deterministic (no hallucinations - Mistral only validates/extends)
+    - YOLO precision + Mistral validation
     - Rich nutrition data and recommendations
+    - Graceful fallback to YOLO-only if Mistral fails
     """
     try:
         # Load and validate image
@@ -925,11 +990,22 @@ async def scan_food_yolo_deepseek(
         yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25)
         logger.info(f"YOLO detected {len(yolo_results)} items")
         
-        # Step 2: DeepSeek Detection (optional - graceful fallback)
-        deepseek_results = []
+        # Step 2: Mistral Validation (optional - graceful fallback)
+        mistral_results = []
         try:
-            logger.info("Step 2: Running DeepSeek-VL2 detection...")
-            deepseek_detector = get_deepseek_detector()
+            logger.info("Step 2: Running Mistral validation...")
+            mistral_validator = get_mistral_validator()
+            if mistral_validator and mistral_validator.api_key:
+                mistral_results = mistral_validator.validate_detections(
+                    image, 
+                    yolo_results, 
+                    confidence_threshold=0.3
+                )
+                logger.info(f"Mistral validated/extended: {len(mistral_results)} items")
+            else:
+                logger.warning("Mistral validator not available (no API key), using YOLO only")
+        except Exception as e:
+            logger.warning(f"Mistral validation failed, continuing with YOLO only: {e}")
             if deepseek_detector:
                 deepseek_results = deepseek_detector.detect_foods(image, confidence_threshold=0.3)
                 logger.info(f"DeepSeek detected {len(deepseek_results)} items")
@@ -941,7 +1017,7 @@ async def scan_food_yolo_deepseek(
         # Step 3: Fusion
         logger.info("Step 3: Fusing detection results...")
         fusion_engine = get_fusion_engine()
-        fused_results = fusion_engine.fuse(yolo_results, deepseek_results)
+        fused_results = fusion_engine.fuse(yolo_results, mistral_results)
         
         if not fused_results:
             logger.warning("No foods detected in image")

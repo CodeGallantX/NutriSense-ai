@@ -176,10 +176,10 @@ class FoodHeuristics:
             advice_parts.append("High carb content - balance with protein and vegetables")
         
         # Check macros
-        if food_data.get('calories', 0) > 300:
+        if (food_data.get('calories') or 0) > 300:
             advice_parts.append("Calorie-dense - watch portion size")
         
-        if food_data.get('fiber', 0) < 2:
+        if (food_data.get('fiber') or 0) < 2:
             advice_parts.append("Low fiber - pair with vegetables")
         
         return " | ".join(advice_parts) if advice_parts else "Enjoy in moderation"
@@ -188,12 +188,12 @@ class FoodHeuristics:
         if not enriched_items:
             return self._empty_meal_summary()
         
-        # Calculate totals
-        total_calories = sum(item['calories'] for item in enriched_items)
-        total_carbs = sum(item['carbs'] for item in enriched_items)
-        total_protein = sum(item['protein'] for item in enriched_items)
-        total_fat = sum(item['fat'] for item in enriched_items)
-        total_fiber = sum(item['fiber'] for item in enriched_items)
+        # Calculate totals with defensive defaults (handle missing data)
+        total_calories = sum(item.get('calories') or 0 for item in enriched_items)
+        total_carbs = sum(item.get('carbs') or 0 for item in enriched_items)
+        total_protein = sum(item.get('protein') or 0 for item in enriched_items)
+        total_fat = sum(item.get('fat') or 0 for item in enriched_items)
+        total_fiber = sum(item.get('fiber') or 0 for item in enriched_items)
         
         # Calculate glycemic load
         glycemic_load = self._calculate_glycemic_load(enriched_items)
@@ -245,8 +245,8 @@ class FoodHeuristics:
         total_gl = 0.0
         
         for item in items:
-            gi = item.get('glycemic_index', 50)  # Default medium GI
-            carbs = item.get('carbs', 0)
+            gi = item.get('glycemic_index') or 50  # Default medium GI
+            carbs = item.get('carbs') or 0
             
             if gi and carbs:
                 gl = (gi * carbs) / 100
@@ -434,7 +434,7 @@ class FoodHeuristics:
                     recommendations['healthy_alternatives'].append(alt)
             
             # High GI foods
-            if item.get('glycemic_index', 0) >= 70:
+            if (item.get('glycemic_index') or 0) >= 70:
                 recommendations['portion_adjustments'].append(
                     f"Reduce {item['name']} portion by 30-40% (high GI)"
                 )

@@ -28,8 +28,8 @@ class YOLOFoodDetector:
         logger.info(f"Loading YOLO model from: {self.model_path}")
         
         try:
-            # Load YOLO model (Ultralytics handles ONNX)
-            self.model = YOLO(str(self.model_path))
+            # Load YOLO model (Ultralytics handles ONNX); explicitly set task to silence warnings
+            self.model = YOLO(str(self.model_path), task="detect")
             logger.info("YOLO model loaded successfully")
             
             # Load class names if available
