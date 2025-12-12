@@ -237,42 +237,28 @@ export default function AnalyzerModal({
       );
       setUploadedImageUrl(imageUrl);
 
-      // Step 1: Advanced YOLO + Mistral detection
-      let yoloResult: unknown = null;
-      try {
-        yoloResult = await postImage("/scan-food-yolo-mistral/", file);
-      } catch (advErr) {
-        console.warn("Advanced detection failed, switching to fallback", advErr);
-      }
-      let detectionResult = yoloResult as Record<string, unknown> | null;
-
-      // Step 2: Fallback to legacy if nothing found
-      const detectionItems = detectionResult && typeof detectionResult === 'object' && 'detected_items' in detectionResult
-        ? (detectionResult.detected_items as unknown[])
+      // Single call: Advanced YOLO + Mistral endpoint (server-side fallback enabled)
+      const apiResult = await postImage("/scan-food-yolo-mistral/", file) as Record<string, unknown>;
+      
+      // Extract detected items
+      const extractedItems = apiResult && typeof apiResult === 'object' && 'detected_items' in apiResult
+        ? (apiResult.detected_items as DetectionItem[])
         : [];
       
-      if (!Array.isArray(detectionItems) || detectionItems.length === 0) {
-        setStatusMessage("No foods from advanced model — trying fallback detection…");
-        detectionResult = await postImage("/scan-food/", file) as Record<string, unknown> | null;
-      }
-
-      // Step 3: Flagship semantic meal analysis (always)
-      setPipelineStage("analyzing");
-      setStatusMessage("Analyzing meal nutrition…");
-      const flagshipResult = await postImage("/analyze-meal", file) as Record<string, unknown>;
-
-      // Extract detected_items safely
-      const extractedItems = detectionResult && typeof detectionResult === 'object' && 'detected_items' in detectionResult
-        ? (detectionResult.detected_items as DetectionItem[])
-        : [];
+      // Prefer flagship analysis embedded by server if present
+      const flagship = apiResult && typeof apiResult === 'object' && 'flagship' in apiResult
+        ? (apiResult.flagship as Record<string, unknown>)
+        : undefined;
+      const mealSummary = (flagship?.meal_summary || apiResult?.meal_summary || apiResult?.mealSummary || {}) as Record<string, unknown>;
+      const recommendations = (flagship?.recommendations || apiResult?.recommendations || {}) as Record<string, unknown>;
 
       const combined: FinalResult = {
         detected_items: extractedItems,
-        meal_summary: (flagshipResult?.meal_summary || flagshipResult?.mealSummary || {}) as Record<string, unknown>,
-        recommendations: (flagshipResult?.recommendations || {}) as Record<string, unknown>,
+        meal_summary: mealSummary,
+        recommendations: recommendations,
         raw: {
-          yolo: detectionResult,
-          flagship: flagshipResult,
+          yolo: apiResult,
+          flagship,
         },
       };
 
@@ -306,8 +292,13 @@ export default function AnalyzerModal({
       // Step 5: Send to chat with insights
       setPipelineStage("insights");
       setStatusMessage("Generating insights…");
-      const { assistantResponse } =
-        await sendFoodAnalysisMessage(userId, convId, userPrompt, normalizedForChat, imageUrl);
+      const { assistantResponse } = await sendFoodAnalysisMessage(
+        userId,
+        convId,
+        userPrompt,
+        normalizedForChat,
+        imageUrl
+      );
 
       const userMessage = `${userPrompt} [Food Image Attached]`;
 
