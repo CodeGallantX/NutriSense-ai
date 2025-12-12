@@ -1,22 +1,37 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { X, Camera, Upload, Sparkles, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Camera, Upload, Sparkles, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { sendFoodAnalysisMessage } from "@/app/actions/chat";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+
+// Define BACKEND_API (use env var)
+const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "";
 
 interface AnalyzerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSendToChat: (userMessage: string, aiResponse: string) => void;
+  onSendToChat: (
+    userMessage: string,
+    aiResponse: string,
+    conversationId: string
+  ) => void;
+  userId: string;
 }
 
-export default function AnalyzerModal({ isOpen, onClose, onSendToChat }: AnalyzerModalProps) {
+export default function AnalyzerModal({
+  isOpen,
+  onClose,
+  onSendToChat,
+  userId,
+}: AnalyzerModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [userPrompt, setUserPrompt] = useState("Analyze this food");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -30,6 +45,7 @@ export default function AnalyzerModal({ isOpen, onClose, onSendToChat }: Analyze
         setSelectedImage(reader.result as string);
         setShowCamera(false);
         stopCamera();
+        setError(null);
       };
       reader.readAsDataURL(file);
     }
@@ -45,8 +61,10 @@ export default function AnalyzerModal({ isOpen, onClose, onSendToChat }: Analyze
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      setError(null);
     } catch (error) {
       console.error("Error accessing camera:", error);
+      setError("Unable to access camera. Please try uploading an image.");
     }
   };
 
@@ -69,55 +87,87 @@ export default function AnalyzerModal({ isOpen, onClose, onSendToChat }: Analyze
         setSelectedImage(imageData);
         stopCamera();
         setShowCamera(false);
+        setError(null);
       }
     }
   };
 
-  const analyzeAndSend = () => {
+  const dataURLToFile = (dataURL: string, filename: string): File => {
+    const [prefix, base64Data] = dataURL.split(",");
+    const mimeType = prefix.match(/:(.*?);/)?.[1] || "image/png";
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new File([byteArray], filename, { type: mimeType });
+  };
+
+  const analyzeAndSend = async () => {
     if (!selectedImage) return;
 
     setIsAnalyzing(true);
+    setError(null);
 
-    // Simulate AI analysis
-    setTimeout(() => {
-      const aiResponse = `I've analyzed your food image. Here's what I found:
+    try {
+      // Convert dataURL to File
+      const file = dataURLToFile(selectedImage, `food-${Date.now()}.png`);
+      const imageUrl = await uploadToSupabaseStorage(
+        "food-images",
+        file,
+      );
 
-**Identified Food:** Mixed Vegetable Salad with Grilled Chicken
+      console.log("Uploaded Image URL:", imageUrl);
+      // Prepare FormData for backend API
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("diabetes", "true"); // Will be overridden in action with real profile
+      formData.append("hypertension", "false");
+      formData.append("ulcer", "false");
+      formData.append("weight_loss", "false");
 
-**Nutritional Breakdown:**
-• Carbohydrates: 15g (Low Glycemic Index)
-• Proteins: 28g (High Quality)
-• Fats: 12g (Healthy Fats)
-• Dietary Fiber: 8g (Excellent Source)
-• Calories: 320 (Moderate)
+      // Call scan-food API
+      const scanRes = await fetch(`${BACKEND_API}/scan-food/`, {
+        method: "POST",
+        body: formData,
+      });
 
-**Diabetes Analysis:**
-✓ Low Glycemic Impact
-✓ Minimal Blood Sugar Spike
-✓ Excellent Protein Content for Satiety
+      if (!scanRes.ok) {
+        throw new Error(`Scan failed: ${scanRes.statusText}`);
+      }
 
-**Recommendations:**
-1. This is an excellent choice for diabetes management
-2. Consider adding a small portion of whole grains
-3. Drink plenty of water with this meal`;
+      const scanOutput = await scanRes.json();
+      console.log("Scan Output:", scanOutput);
 
-      const userMessage = userPrompt + " [Food Image Attached]";
-      
+      // Call new server action for food analysis message
+      const { conversationId, assistantResponse } =
+        await sendFoodAnalysisMessage(userId, userPrompt, scanOutput, imageUrl);
+
+      const userMessage = `${userPrompt} [Food Image Attached]`;
+
       // Send to chat
-      onSendToChat(userMessage, aiResponse);
-      
+      onSendToChat(userMessage, assistantResponse, conversationId);
       // Reset and close
-      setIsAnalyzing(false);
       resetAnalysis();
       onClose();
-    }, 2000);
+    } catch (err) {
+      console.error("Analysis error:", err);
+      setError("Failed to analyze image. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const resetAnalysis = () => {
     setSelectedImage(null);
     setShowCamera(false);
     setUserPrompt("Analyze this food");
+    setError(null);
     stopCamera();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleClose = () => {
@@ -130,17 +180,28 @@ export default function AnalyzerModal({ isOpen, onClose, onSendToChat }: Analyze
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">Scan Food with AI</h2>
-            <Button variant="ghost" size="icon" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
+           <DialogTitle>Scan Food with AI</DialogTitle>
           </div>
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Error Display */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
           {/* Upload/Camera Section */}
           {!selectedImage && !showCamera ? (
             <div className="space-y-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
@@ -275,4 +336,30 @@ export default function AnalyzerModal({ isOpen, onClose, onSendToChat }: Analyze
       </DialogContent>
     </Dialog>
   );
+}
+
+// Helper for storage upload (lib/storage.ts)
+export async function uploadToSupabaseStorage(
+  bucket: string,
+  file: File,
+): Promise<string> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(`private/${file.name}`, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (error) {
+    console.error("Upload error:", error);
+    throw new Error("Failed to upload image");
+  }
+
+  // Get public URL
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(bucket).getPublicUrl(data.path);
+
+  return publicUrl;
 }

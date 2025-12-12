@@ -1,54 +1,30 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-"use client"
+// app/(protected)/layout.tsx or similar server layout file
+// This is now a server component for fetching user
 
-import type React from "react"
+import { redirect } from "next/navigation";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import ClientDashboard from "@/components/client-layout";
 
-import { useState } from "react"
-import Sidebar from "@/components/sidebar"
-import Navbar from "@/components/navbar"
-
-type User = {
-  name?: string | undefined
-  email?: string | undefined
-  avatar?: string | undefined
-}
-
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [user, setUser] = useState<User | undefined>(undefined)
+  const supabase = await getSupabaseServerClient();
 
-  // No fetches for user or documents
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <>
-        <div
-          className={`
-            fixed inset-y-0 left-0 z-50 
-            lg:sticky lg:top-0 lg:z-auto
-            transition-transform duration-300 ease-in-out
-            ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-          `}
-        >
-          <Sidebar onNavigate={() => setSidebarOpen(false)} />
-        </div>
+  if (!user) {
+    redirect("/auth/signin");
+  }
 
-        {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
-      </>
+  const userData = {
+    name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+    email: user.email ?? "no-email",
+    avatar: user.user_metadata?.avatar_url || "",
+  };
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Navbar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} user={user} />
-
-        <main className="flex-1 overflow-auto">{children}</main>
-      </div>
-    </div>
-  )
+  return <ClientDashboard user={userData}>{children}</ClientDashboard>;
 }

@@ -1,3 +1,9 @@
+// Updated Navbar component
+// - User is now passed as a required prop from server-side fetch (remove optional ? if desired)
+// - Updated logout to use Supabase client-side auth.signOut() for consistency
+// - Assumes you have a Supabase client hook or instance available client-side
+// - If not, install @supabase/supabase-js and create a client-side client (e.g., via createClient in a lib file)
+
 "use client";
 
 import { Menu, Settings, LogOut } from "lucide-react";
@@ -5,26 +11,29 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"; // Adjust to your client-side Supabase setup
 
 interface NavbarProps {
   onMenuToggle?: () => void;
   sidebarOpen?: boolean;
-  user?: {
-    name?: string;
-    email?: string;
-    avatar?: string;
+  user: {
+    // Made non-optional since fetched server-side
+    name: string;
+    email: string;
+    avatar: string;
   };
   loading?: boolean;
 }
 
 const Navbar = ({ onMenuToggle, user }: NavbarProps) => {
   const router = useRouter();
+  const supabase = getSupabaseBrowserClient(); // Client-side Supabase instance
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const fallbackLetter = user?.name?.charAt(0)?.toUpperCase() || "N";
+  const fallbackLetter = user.name.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/auth/login");
+    await supabase.auth.signOut();
+    router.push("/auth/signin"); // Updated to match redirect path
   };
 
   return (
@@ -49,7 +58,7 @@ const Navbar = ({ onMenuToggle, user }: NavbarProps) => {
           className="cursor-pointer"
         >
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user?.avatar || ""} />
+            <AvatarImage src={user.avatar} />
             <AvatarFallback>{fallbackLetter}</AvatarFallback>
           </Avatar>
         </button>
@@ -64,28 +73,15 @@ const Navbar = ({ onMenuToggle, user }: NavbarProps) => {
             <div className="p-4 border-b border-border">
               <div className="flex items-center gap-3 mb-3">
                 <Avatar className="h-12 w-12">
-                  <AvatarImage src={user?.avatar || ""} />
+                  <AvatarImage src={user.avatar} />
                   <AvatarFallback>{fallbackLetter}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">{user?.name}</p>
+                  <p className="text-sm font-semibold truncate">{user.name}</p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {user?.email}
+                    {user.email}
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Token Usage */}
-            <div className="px-4 py-3 border-b border-border">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  Token Usage
-                </span>
-                <span className="text-sm font-semibold">1,250 / 2,000</span>
-              </div>
-              <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                <div className="h-full w-[62.5%] bg-primary rounded-full" />
               </div>
             </div>
 
