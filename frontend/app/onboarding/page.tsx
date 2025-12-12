@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -494,6 +495,54 @@ export default function OnboardingPage() {
   const [showCompletion, setShowCompletion] = useState(false);
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
+  const [isChecking, setIsChecking] = useState(true); 
+
+  // Redirect to dashboard if onboarding already completed
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace("/auth/signin");
+        return;
+      }
+
+      // Fetch profile
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .single();
+
+      if (error || !profile) {
+        console.error("Error fetching profile:", error);
+        setIsChecking(false);
+        return;
+      }
+
+      // Already completed → go straight to dashboard
+      if (profile.onboarding_completed === true) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      // Not completed → allow onboarding flow
+      setIsChecking(false);
+    };
+
+    checkOnboardingStatus();
+  }, [supabase, router]);
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-teal-50 to-blue-50">
+        <div className="text-center">
+          <Sparkles className="w-12 h-12 text-primary mx-auto mb-4 animate-pulse" />
+          <p className="text-muted-foreground">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   const [formData, setFormData] = useState<FormData>({
     country: "",

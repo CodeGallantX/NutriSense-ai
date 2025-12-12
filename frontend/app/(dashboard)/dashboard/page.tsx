@@ -54,18 +54,30 @@ export default function DashboardLanding() {
 
   // Fetch user on mount
   useEffect(() => {
-    const fetchUser = async () => {
+    const checkUserAndOnboarding = async () => {
       const { data, error } = await supabase.auth.getUser();
 
       if (error || !data?.user) {
         setUserId("demo-user");
-      } else {
-        setUserId(data.user.id);
+        return;
       }
+
+      const uid = data.user.id;
+      setUserId(uid);
+
+      const userProfile = await getUserProfile(uid);
+      setProfile(userProfile);
+
+      // Redirect to onboarding if not completed
+      if (!userProfile?.onboarding_completed) {
+        router.replace("/onboarding");
+        return;
+      }
+
     };
 
-    fetchUser();
-  }, [supabase]);
+    checkUserAndOnboarding();
+  }, [supabase, router]);
 
   // Fetch profile and show initial message when userId changes
   useEffect(() => {
