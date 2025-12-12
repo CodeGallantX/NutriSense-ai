@@ -225,10 +225,11 @@ app = FastAPI(
                "• **Hierarchical Analysis** - Primary detection + hierarchical classification + heuristics\n\n"
                "**Supported Conditions:**\n"
                "Diabetes | Hypertension | Ulcers | Acid Reflux | Weight Management",
-    version="2.0",
+    version="1.0",
     contact={
-        "name": "NutriSense Team",
-        "url": "https://github.com/meet-tola/NutriSense-ai"
+        "name": "NutriSense AI",
+        "url": "https://nutri-sense-ai-eight.vercel.app/dashboard",
+        # "url": "https://github.com/meet-tola/NutriSense-ai",
     },
     openapi_tags=[
         {
@@ -254,6 +255,7 @@ app.add_middleware(
         "http://localhost:8000",           
         "https://nutri-sense-ai-eight.vercel.app",
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -861,7 +863,13 @@ def health():
     )
 
 
-# TODO: Re-enable DeepSeek endpoint when needed
+# Alias with trailing slash to avoid redirects
+@app.get("/health/", tags=["Health"], include_in_schema=False)
+def health_with_slash():
+    return health()
+
+
+# Disabled Deepseek; using Mistral API key. Re-enable DeepSeek endpoint when needed
 # @app.post(
 #     "/scan-food-yolo-deepseek/",
 #     tags=["Food Detection"],
