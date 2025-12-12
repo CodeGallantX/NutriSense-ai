@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatePresence, motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 
 interface BaseField {
   key: string;
@@ -40,7 +41,19 @@ interface CheckboxField extends BaseField {
 type Field = NumberField | TextField | SelectField | CheckboxField;
 
 const allFields: Field[] = [
-  // Step 1: Age
+  // Step 1: Country/Region
+  {
+    key: "country",
+    label: "Which country do you live in?",
+    type: "select",
+    options: [
+      { value: "nigeria", label: "Nigeria 🇳🇬" },
+      { value: "other", label: "Outside Africa" },
+    ],
+    description:
+      "This helps us suggest local foods and ingredients available in your area.",
+  },
+  // Step 3: Age
   {
     key: "age",
     label: "How old are you?",
@@ -49,7 +62,7 @@ const allFields: Field[] = [
     unit: "years",
     description: "We use your age to personalize your daily recommendations.",
   },
-  // Step 2: Gender
+  // Step 4: Gender
   {
     key: "gender",
     label: "What is your gender?",
@@ -57,45 +70,115 @@ const allFields: Field[] = [
     options: [
       { value: "male", label: "Male" },
       { value: "female", label: "Female" },
+      { value: "prefer_not_say", label: "Prefer not to say" },
     ],
     description: "This helps tailor advice to your body.",
   },
-  // Step 3: Weight
+  // Step 5: Weight
   {
     key: "weight",
     label: "What is your weight?",
     type: "number",
     placeholder: "70",
     unit: "kg",
-    description: "We'll use this for nutritional calculations.",
+    description: "We'll use this for nutritional calculations. Skip if unsure.",
   },
-  // Step 4: Height
+  // Step 6: Height
   {
     key: "height",
     label: "What is your height?",
     type: "number",
     placeholder: "175",
     unit: "cm",
-    description: "This helps determine your ideal weight range.",
+    description:
+      "This helps determine your ideal weight range. Skip if unsure.",
   },
-  // Step 5: Activity Level
+  // Step 7: Primary Health Goal
+  {
+    key: "primaryGoal",
+    label: "What's your primary health goal?",
+    type: "select",
+    options: [
+      { value: "balanced_meals", label: "🍽️ Eat balanced meals" },
+      { value: "low_budget_health", label: "💰 Eat healthier on low budget" },
+      { value: "weight_friendly", label: "⚖️ Weight-friendly planning" },
+      { value: "healthy_combos", label: "🔍 Discover healthy food combos" },
+      { value: "track_health", label: "📊 Track & improve health issues" },
+      // { value: "general_wellness", label: "🌟 General wellness & vitality" },
+    ],
+    description: "Choose what matters most to you right now.",
+  },
+  // Step 8: Secondary Goals
+  {
+    key: "secondaryGoals",
+    label: "Any other goals? (Select all that apply)",
+    type: "checkboxes",
+    options: [
+      "Lose weight",
+      "Gain muscle",
+      "Better digestion",
+      "Clearer skin",
+      "Better sleep",
+      "Manage stress",
+      "Improve immunity",
+      "Save money on food",
+      "Learn cooking skills",
+    ],
+    description: "Select as many as you like. Helps us create a complete plan.",
+  },
+  // Step 9: Eating Pattern & Lifestyle
+  {
+    key: "eatingPattern",
+    label: "What's your eating pattern?",
+    type: "select",
+    options: [
+      { value: "regular_3meals", label: "🍽️ Regular 3 meals/day" },
+      { value: "frequent_snacker", label: "🍎 Frequent snacker" },
+      { value: "skip_breakfast", label: "🌅 Often skip breakfast" },
+      { value: "intermittent_fasting", label: "⏰ Intermittent fasting" },
+      { value: "late_night_eater", label: "🌙 Late-night eater" },
+      { value: "variable_schedule", label: "🔄 Irregular schedule" },
+      { value: "home_cook", label: "👩‍🍳 Mostly home-cooked meals" },
+      { value: "eat_out_often", label: "🏪 Eat out often" },
+    ],
+    description: "Tell us about your daily eating habits.",
+  },
+  // Step 10: Activity Level
   {
     key: "activityLevel",
     label: "What is your activity level?",
     type: "select",
     options: [
-      { value: "sedentary", label: "Sedentary (little or no exercise)" },
-      { value: "light", label: "Light (exercise 1-3 days/week)" },
+      { value: "sedentary", label: "Sedentary (office job, little exercise)" },
+      { value: "light", label: "Light (walking, light chores 1-3 days/week)" },
       { value: "moderate", label: "Moderate (exercise 3-5 days/week)" },
       { value: "active", label: "Active (exercise 6-7 days/week)" },
       {
         value: "very_active",
-        label: "Very Active (physical job or 2x training)",
+        label: "Very Active (physical job or intense training)",
       },
     ],
     description: "Adjusts your calorie needs based on movement.",
   },
-  // Step 6: Dietary Preferences
+  // Step 11: Weekly Food Budget (in local currency)
+  {
+    key: "weeklyBudget",
+    label: "Weekly food budget?",
+    type: "select",
+    options: [
+      { value: "5000", label: "₦5,000 or less" },
+      { value: "10000", label: "₦5,000 - ₦10,000" },
+      { value: "15000", label: "₦10,000 - ₦15,000" },
+      { value: "20000", label: "₦15,000 - ₦20,000" },
+      { value: "25000", label: "₦20,000 - ₦25,000" },
+      { value: "30000", label: "₦25,000 - ₦30,000" },
+      { value: "40000", label: "₦30,000 - ₦40,000" },
+      { value: "50000", label: "₦40,000+" },
+      { value: "not_sure", label: "Not sure / varies" },
+    ],
+    description: "Helps find affordable meal ideas for your budget.",
+  },
+  // Step 12: Dietary Preferences
   {
     key: "dietary",
     label: "Any dietary preferences?",
@@ -104,75 +187,90 @@ const allFields: Field[] = [
       "Vegetarian",
       "Vegan",
       "Halal",
-      "Kosher",
       "Gluten-Free",
       "Dairy-Free",
-      "Pescatarian",
+      "Low-carb",
+      "Low-sodium",
+      "No pork",
+      "No restrictions",
     ],
-    description: "We'll suggest meals that fit your style.",
+    description:
+      "Select all that apply. We'll suggest meals that fit your style.",
   },
-  // Step 7: Allergies
+  // Step 13: Allergies & Dislikes
   {
     key: "allergies",
-    label: "Any allergies?",
+    label: "Any allergies or strong dislikes?",
     type: "text",
     unit: "",
-    placeholder: "peanuts, shellfish, soy",
-    description: "List them comma-separated to avoid them.",
+    placeholder: "e.g., peanuts, shellfish, okra, bitter leaf",
+    description: "List them comma-separated. We'll avoid them in suggestions.",
   },
-  // Step 8: Health Conditions
+  // Step 14: Health Conditions
   {
     key: "healthConditions",
-    label: "Any health conditions?",
+    label: "Any health conditions? (Optional)",
     type: "checkboxes",
     options: [
       "Type 2 Diabetes",
       "Type 1 Diabetes",
       "Prediabetes",
-      "Hypertension",
+      "Hypertension (High BP)",
       "High Cholesterol",
-      "Heart Disease",
-      "Celiac Disease",
+      "Arthritis",
+      "Asthma",
+      "Anemia",
+      "PCOS",
+      "Thyroid issues",
+      "None",
     ],
-    description: "This ensures safe, targeted recommendations.",
+    description:
+      "This ensures safe, targeted recommendations. Skip if no conditions.",
   },
-  // Step 9: Monthly Budget
-  {
-    key: "monthlyBudget",
-    label: "What's your monthly food budget?",
-    type: "number",
-    placeholder: "300",
-    unit: "USD",
-    description: "Helps find affordable meal ideas.",
-  },
-  // Step 10: Cuisines
+  // Step 15: Preferred Cuisines & Local Foods
   {
     key: "cuisines",
-    label: "Preferred cuisines?",
+    label: "Favorite foods & cuisines?",
     type: "checkboxes",
     options: [
+      // Nigerian
+      "Jollof Rice",
+      "Pounded Yam & Egusi",
+      "Amala & Ewedu",
+      "Suya & Kilishi",
+      "Moi Moi",
+      "Akara",
+      // International
       "Italian",
       "Chinese",
       "Indian",
       "Mexican",
-      "Japanese",
-      "Thai",
-      "Mediterranean",
       "American",
-      "Middle Eastern",
-      "Korean",
+      "Mediterranean",
+      // General
+      "Grilled foods",
+      "Soups & Stews",
+      "Rice dishes",
+      "Bean dishes",
+      "Vegetable meals",
+      "Snacks & Small chops",
     ],
-    description: "We'll mix in flavors you love.",
+    description: "We'll mix in flavors and foods you love.",
   },
 ];
 
 interface FormData {
+  country: string;
+  region: string;
   age: string;
   weight: string;
   height: string;
   gender: string;
+  primaryGoal: string;
+  secondaryGoals: string[];
+  eatingPattern: string;
   activityLevel: string;
-  monthlyBudget: string;
+  weeklyBudget: string;
   selectedDietary: string[];
   selectedCuisines: string[];
   allergies: string;
@@ -183,6 +281,8 @@ interface FormData {
   targetBSMax: string;
 }
 
+// Rest of the component functions remain the same (NumberOrTextInput, CustomSelect, CheckboxList, FieldRenderer, DiabetesSection)
+
 function NumberOrTextInput({
   field,
   value,
@@ -192,6 +292,8 @@ function NumberOrTextInput({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const inputPadding = field.type === "number" ? "pr-12" : "pr-10";
+
   return (
     <div className="relative">
       <Input
@@ -200,10 +302,10 @@ function NumberOrTextInput({
         placeholder={field.placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-16 text-2xl text-center border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none px-4"
+        className={`w-full h-16 text-2xl text-center border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none px-4 ${inputPadding}`}
       />
       {field.unit && (
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg text-gray-500">
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg text-gray-500 pointer-events-none">
           {field.unit}
         </span>
       )}
@@ -221,7 +323,7 @@ function CustomSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3 max-h-96">
+    <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
       {field.options.map((opt) => {
         const selected = value === opt.value;
         return (
@@ -230,7 +332,7 @@ function CustomSelect({
             onClick={() => onChange(opt.value)}
             className={`p-4 rounded-xl border-2 text-center font-medium text-lg ${
               selected
-                ? "border-green-500 bg-green-50 text-green-700"
+                ? "border-teal-800 bg-teal-50 text-teal-700"
                 : "border-gray-200 hover:border-gray-300"
             }`}
             whileHover={{ scale: selected ? 1 : 1.02 }}
@@ -253,9 +355,11 @@ function CheckboxList({
   value: string[];
   onToggle: (option: string) => void;
 }) {
+  const safeValue = Array.isArray(value) ? value : [];
+
   return (
     <div className="max-h-96 overflow-y-auto space-y-3 p-4">
-      {value.length === 0 && (
+      {safeValue.length === 0 && (
         <p className="text-sm text-gray-500 text-center">None selected</p>
       )}
       <div className="grid grid-cols-1 gap-3">
@@ -269,7 +373,7 @@ function CheckboxList({
           >
             <Checkbox
               id={option}
-              checked={value.includes(option)}
+              checked={safeValue.includes(option)}
               onCheckedChange={() => onToggle(option)}
               className="h-6 w-6"
             />
@@ -387,16 +491,22 @@ function DiabetesSection({
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
 
   const [formData, setFormData] = useState<FormData>({
+    country: "",
+    region: "",
     age: "",
     weight: "",
     height: "",
     gender: "",
+    primaryGoal: "",
+    secondaryGoals: [],
+    eatingPattern: "",
     activityLevel: "",
-    monthlyBudget: "",
+    weeklyBudget: "",
     selectedDietary: [],
     selectedCuisines: [],
     allergies: "",
@@ -414,14 +524,34 @@ export default function OnboardingPage() {
   };
 
   const handleCheckboxToggle = (key: string, option: string) => {
-    const current = formData[key as keyof FormData] as string[];
+    const current = (formData[key as keyof FormData] as string[]) || [];
     const newSelection = current.includes(option)
       ? current.filter((item) => item !== option)
       : [...current, option];
+
     handleInputChange(key, newSelection);
 
     if (key === "selectedConditions") {
       const isDiabetes = option.toLowerCase().includes("diabetes");
+      const isNone = option === "None";
+
+      if (isNone && !current.includes(option)) {
+        // If "None" is selected, clear all other selections
+        setFormData((prev) => ({
+          ...prev,
+          selectedConditions: ["None"],
+          hasDiabetes: false,
+          diabetesType: "",
+        }));
+        return;
+      }
+
+      if (isNone && current.includes(option)) {
+        // If "None" is being unselected, just remove it
+        handleInputChange(key, []);
+        return;
+      }
+
       if (isDiabetes && !current.includes(option)) {
         setFormData((prev) => ({
           ...prev,
@@ -453,6 +583,8 @@ export default function OnboardingPage() {
   const handleNext = () => {
     if (step < allFields.length) {
       setStep((prev) => prev + 1);
+    } else {
+      setShowCompletion(true);
     }
   };
 
@@ -478,25 +610,35 @@ export default function OnboardingPage() {
       .map((a) => a.trim())
       .filter((a) => a);
 
+    // Filter out "None" from conditions if selected
+    const conditions = formData.selectedConditions.includes("None")
+      ? []
+      : formData.selectedConditions.filter((c) => c !== "None");
+
     const { error } = await supabase
       .from("profiles")
       .update({
+        country: formData.country || null,
+        region: formData.region === "skip" ? null : formData.region || null,
         age: formData.age ? Number.parseInt(formData.age) : null,
         weight_kg: formData.weight ? Number.parseFloat(formData.weight) : null,
         height_cm: formData.height ? Number.parseFloat(formData.height) : null,
-        gender: formData.gender || null,
+        gender:
+          formData.gender === "prefer_not_say" ? null : formData.gender || null,
+        primary_goal: formData.primaryGoal || null,
+        secondary_goals:
+          formData.secondaryGoals.length > 0 ? formData.secondaryGoals : null,
+        eating_pattern: formData.eatingPattern || null,
         activity_level: formData.activityLevel || null,
+        weekly_budget:
+          formData.weeklyBudget === "not_sure"
+            ? null
+            : formData.weeklyBudget || null,
         dietary_preferences:
           formData.selectedDietary.length > 0 ? formData.selectedDietary : null,
         allergies: allergiesArray.length > 0 ? allergiesArray : null,
-        health_conditions:
-          formData.selectedConditions.length > 0
-            ? formData.selectedConditions
-            : null,
-        monthly_budget_usd: formData.monthlyBudget
-          ? Number.parseFloat(formData.monthlyBudget)
-          : null,
-        cultural_cuisine_preferences:
+        health_conditions: conditions.length > 0 ? conditions : null,
+        cuisine_preferences:
           formData.selectedCuisines.length > 0
             ? formData.selectedCuisines
             : null,
@@ -508,6 +650,7 @@ export default function OnboardingPage() {
         target_blood_sugar_max: formData.targetBSMax
           ? Number.parseInt(formData.targetBSMax)
           : null,
+        onboarding_completed: true,
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
@@ -518,10 +661,124 @@ export default function OnboardingPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Show completion message for 2 seconds before redirecting
+    setTimeout(() => {
+      router.push("/dashboard");
+    }, 2000);
   };
 
   const progress = (step / allFields.length) * 100;
+
+  if (showCompletion) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-teal-50 via-white to-blue-50 p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md text-center space-y-8"
+        >
+          <div className="space-y-4 mt-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring" }}
+              className="flex items-center justify-center mx-auto"
+            >
+              <Sparkles className="w-8 h-8 text-primary" />
+            </motion.div>
+
+            <h1 className="text-3xl font-serif text-gray-900">
+              Perfect! We&apos;ve refined your data
+            </h1>
+
+            <p className="text-lg text-gray-600">
+              Your profile is now personalized for:
+            </p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="space-y-4"
+          >
+            <div >
+
+              <div className="p-4 bg-green-50 rounded-xl">
+                <p className="text-sm text-green-600">Primary Goal</p>
+                <p className="font-semibold">
+                  {formData.primaryGoal === "balanced_meals"
+                    ? "Balanced Meals"
+                    : formData.primaryGoal === "low_budget_health"
+                    ? "Healthy on Budget"
+                    : formData.primaryGoal
+                        ?.replace(/_/g, " ")
+                        .charAt(0)
+                        .toUpperCase() + formData.primaryGoal?.slice(1)}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 bg-linear-to-r from-teal-50 to-blue-50 rounded-2xl border-2 border-teal-100">
+              <h3 className="font-bold text-xl mb-3">Your Dashboard Awaits!</h3>
+              <p className="text-gray-700 mb-4">
+                Based on your profile, here&apos;s what you can do:
+              </p>
+              <div className="space-y-3 text-left">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🤖</span>
+                  <span>
+                    <strong>Chat with AI Nutritionist:</strong> Get personalized
+                    meal advice
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📱</span>
+                  <span>
+                    <strong>Scan & Track:</strong> Log meals, track nutrients
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">💊</span>
+                  <span>
+                    <strong>Health Monitoring:</strong>{" "}
+                    {formData.selectedConditions.length > 0
+                      ? "Track your conditions & progress"
+                      : "Monitor your wellness journey"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🛒</span>
+                  <span>
+                    <strong>Budget-Friendly Plans:</strong> Local recipes within
+                    your budget
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="pt-4"
+          >
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="w-full h-12 text-lg"
+            >
+              {loading ? "Finalizing..." : "🚀 Go to Dashboard"}
+            </Button>
+            <p className="text-sm text-gray-500 mt-3">
+              Taking you to your personalized dashboard...
+            </p>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-linear-to-br from-teal-50 via-white to-blue-50 p-4">
@@ -568,7 +825,8 @@ export default function OnboardingPage() {
                   onCheckboxToggle={handleCheckboxToggle}
                 />
 
-                {step === 8 && (
+                {/* Show diabetes section if diabetes condition is selected */}
+                {step === 14 && formData.hasDiabetes && (
                   <DiabetesSection
                     formData={formData}
                     onInputChange={handleInputChange}
@@ -587,21 +845,20 @@ export default function OnboardingPage() {
 
           <div className="flex gap-3 w-full">
             {step > 1 && (
-              <Button variant="outline" onClick={handleBack} className="flex-1 h-10 sm:h-12 rounded-lg text-sm sm:text-md">
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                className="flex-1 h-10 sm:h-12 rounded-lg text-sm sm:text-md"
+              >
                 Back
               </Button>
             )}
 
             <Button
-              onClick={step === allFields.length ? handleSubmit : handleNext}
-              disabled={loading}
+              onClick={handleNext}
               className="flex-1 h-10 sm:h-12 rounded-lg text-sm sm:text-md"
             >
-              {loading
-                ? "Saving..."
-                : step === allFields.length
-                ? "Complete Setup"
-                : "Next"}
+              {step === allFields.length ? "Complete Setup" : "Next"}
             </Button>
           </div>
         </div>

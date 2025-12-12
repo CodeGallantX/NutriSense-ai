@@ -114,7 +114,7 @@ export default function DashboardPage() {
       {/* Middle Section - Chat Interface */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Chat Messages Area */}
-        <div 
+        <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4"
         >
@@ -151,12 +151,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Sticky Bottom Section with Input and Options */}
-        <div className={`sticky bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
-          isScrolled ? 'shadow-lg' : ''
-        }`}>
+        <div
+          className={`sticky bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
+            isScrolled ? "shadow-lg" : ""
+          }`}
+        >
           {/* Feature Action Buttons - Sticky above input with hidden scrollbar */}
           <div className="max-w-3xl mx-auto px-4">
-            <div className="flex items-center gap-3 overflow-x-auto pb-3 
+            <div
+              className="flex items-center gap-3 overflow-x-auto pb-3 
               scrollbar-hide 
               [&::-webkit-scrollbar]:hidden 
               [-ms-overflow-style:none] 
@@ -165,15 +168,17 @@ export default function DashboardPage() {
               active:overflow-x-auto
               touch-pan-x"
             >
-              <Button
-                onClick={handleImageUpload}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-              >
-                <Camera className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">Scan Food</span>
-              </Button>
+              <Link href="/analyzer">
+                <Button
+                  onClick={handleImageUpload}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
+                >
+                  <Camera className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Scan Food</span>
+                </Button>
+              </Link>
 
               <Link href="/meals">
                 <Button
@@ -186,7 +191,7 @@ export default function DashboardPage() {
                 </Button>
               </Link>
 
-              <Link href="/analytics">
+              <Link href="/health-diary">
                 <Button
                   variant="outline"
                   size="sm"
