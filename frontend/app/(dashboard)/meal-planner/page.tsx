@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  ChefHat, Apple, Leaf, Clock, ChevronLeft, 
-  CheckCircle,Save, Plus, X, DollarSign,
+import {
+  ChefHat, Apple, Leaf, Clock, ChevronLeft,
+  CheckCircle, Save, Plus, X, DollarSign,
   BarChart, ShoppingBag, Scale, Heart, Target, UtensilsCrossed,
   Package, Droplets, Carrot, Beef, Milk, Wheat,
   Thermometer, AlertCircle, CalendarDays
@@ -74,14 +74,14 @@ interface MealPlan {
 }
 
 // Typing Effect Component
-function TypingEffect({ 
-  text, 
-  speed = 2, 
+function TypingEffect({
+  text,
+  speed = 2,
   onComplete,
-  className = "" 
-}: { 
-  text: string; 
-  speed?: number; 
+  className = ""
+}: {
+  text: string;
+  speed?: number;
   onComplete?: () => void;
   className?: string;
 }) {
@@ -113,11 +113,11 @@ function TypingEffect({
 }
 
 // Welcome Step with Two Options
-function WelcomeStep({ 
-  onSelectMealPlanning, 
-  onSelectBudgeting 
-}: { 
-  onSelectMealPlanning: () => void; 
+function WelcomeStep({
+  onSelectMealPlanning,
+  onSelectBudgeting
+}: {
+  onSelectMealPlanning: () => void;
   onSelectBudgeting: () => void;
 }) {
   const [welcomeTextComplete, setWelcomeTextComplete] = useState(false)
@@ -130,7 +130,7 @@ function WelcomeStep({
     >
       <div className="space-y-6">
         <h1 className="text-4xl font-serif text-gray-900">Smart Kitchen Manager</h1>
-        
+
         <div className="space-y-4">
           <TypingEffect
             text="Welcome to your kitchen companion. Whether you want to create meal plans or manage your food budget, we're here to help."
@@ -148,7 +148,7 @@ function WelcomeStep({
           className="space-y-8"
         >
           <h2 className="text-xl font-semibold text-gray-900">What would you like to do today?</h2>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Meal Planning Option */}
             <motion.button
@@ -205,12 +205,12 @@ function WelcomeStep({
 }
 
 // Budgeting: Food Inventory Step
-function FoodInventoryStep({ 
-  ingredients, 
-  onAddIngredient, 
+function FoodInventoryStep({
+  ingredients,
+  onAddIngredient,
   onRemoveIngredient,
-  onNext 
-}: { 
+  onNext
+}: {
   ingredients: Ingredient[];
   onAddIngredient: (ing: Omit<Ingredient, 'id'>) => void;
   onRemoveIngredient: (id: string) => void;
@@ -276,7 +276,7 @@ function FoodInventoryStep({
 
         <TypingEffect
           text="Let's take inventory of what's in your kitchen. Add each food item with details to get personalized suggestions."
-          speed={30}
+          speed={3}
           onComplete={() => setIntroTextComplete(true)}
           className="text-gray-700"
         />
@@ -398,13 +398,12 @@ function FoodInventoryStep({
                 {ingredients.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-4 bg-white border rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        item.category === 'protein' ? 'bg-red-50' :
-                        item.category === 'vegetable' ? 'bg-green-50' :
-                        item.category === 'fruit' ? 'bg-yellow-50' :
-                        item.category === 'grain' ? 'bg-amber-50' :
-                        'bg-gray-50'
-                      }`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.category === 'protein' ? 'bg-red-50' :
+                          item.category === 'vegetable' ? 'bg-green-50' :
+                            item.category === 'fruit' ? 'bg-yellow-50' :
+                              item.category === 'grain' ? 'bg-amber-50' :
+                                'bg-gray-50'
+                        }`}>
                         {(() => {
                           const CatIcon = foodCategories.find(c => c.value === item.category)?.icon || Package
                           return <CatIcon className="w-5 h-5" />
@@ -426,7 +425,7 @@ function FoodInventoryStep({
                     <div className="flex items-center gap-3">
                       <Badge variant={
                         item.priority === 'use-first' ? 'destructive' :
-                        item.priority === 'regular' ? 'default' : 'outline'
+                          item.priority === 'regular' ? 'default' : 'outline'
                       }>
                         {item.priority.replace('-', ' ')}
                       </Badge>
@@ -443,7 +442,7 @@ function FoodInventoryStep({
             )}
 
             {ingredients.length > 0 && (
-              <Button 
+              <Button
                 onClick={onNext}
                 className="w-full h-12"
                 disabled={ingredients.length < 3}
@@ -480,11 +479,11 @@ function NutritionReportStep({
         categories[ing.category] = (categories[ing.category] || 0) + 1
       })
 
-      const expiryAlerts = ingredients.filter(ing => 
+      const expiryAlerts = ingredients.filter(ing =>
         ing.expiryDate && new Date(ing.expiryDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       ).length
 
-      const estimatedValue = ingredients.reduce((sum, ing) => 
+      const estimatedValue = ingredients.reduce((sum, ing) =>
         sum + (ing.estimatedCost || 0), 0
       )
 
@@ -624,11 +623,11 @@ function NutritionReportStep({
                 <Progress value={report.nutritionScore} className="h-2" />
               </div>
               <p className="text-sm text-gray-600">
-                {report.nutritionScore > 80 
+                {report.nutritionScore > 80
                   ? "Excellent variety! You have a well-balanced inventory."
                   : report.nutritionScore > 60
-                  ? "Good start! Consider adding more variety."
-                  : "Consider adding more food groups for balanced nutrition."}
+                    ? "Good start! Consider adding more variety."
+                    : "Consider adding more food groups for balanced nutrition."}
               </p>
             </CardContent>
           </Card>
@@ -653,8 +652,8 @@ function NutritionReportStep({
                 {report.wasteRisk > 70
                   ? "High risk! Use perishable items immediately."
                   : report.wasteRisk > 40
-                  ? "Moderate risk. Plan meals around expiring items."
-                  : "Low risk. Your inventory is well-managed."}
+                    ? "Moderate risk. Plan meals around expiring items."
+                    : "Low risk. Your inventory is well-managed."}
               </p>
             </CardContent>
           </Card>
@@ -706,15 +705,15 @@ function NutritionReportStep({
 
         {/* Action Buttons */}
         <div className="flex gap-4 pt-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={onBack}
             className="flex-1 h-12"
           >
             <ChevronLeft className="w-5 h-5 mr-2" />
             Back to Inventory
           </Button>
-          <Button 
+          <Button
             onClick={onNext}
             className="flex-1 h-12"
           >
@@ -907,15 +906,15 @@ function MealSuggestionsStep({
           </Card>
 
           <div className="flex gap-4 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={onBack}
               className="flex-1 h-12"
             >
               <ChevronLeft className="w-5 h-5 mr-2" />
               Back to Report
             </Button>
-            <Button 
+            <Button
               onClick={onComplete}
               className="flex-1 h-12"
             >
@@ -973,18 +972,18 @@ export default function SmartKitchenPage() {
         <AnimatePresence mode="wait">
           {step === "welcome" && (
             <motion.div key="welcome" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <WelcomeStep 
+              <WelcomeStep
                 onSelectMealPlanning={handleSelectMealPlanning}
                 onSelectBudgeting={handleSelectBudgeting}
               />
             </motion.div>
           )}
-          
+
           {step === "budgeting" && (
             <motion.div key="budgeting" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <Button 
-                variant="ghost" 
-                onClick={() => setStep("welcome")} 
+              <Button
+                variant="ghost"
+                onClick={() => setStep("welcome")}
                 className="mb-4"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
@@ -998,12 +997,12 @@ export default function SmartKitchenPage() {
               />
             </motion.div>
           )}
-          
+
           {step === "report" && (
             <motion.div key="report" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <Button 
-                variant="ghost" 
-                onClick={() => setStep("budgeting")} 
+              <Button
+                variant="ghost"
+                onClick={() => setStep("budgeting")}
                 className="mb-4"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
@@ -1016,12 +1015,12 @@ export default function SmartKitchenPage() {
               />
             </motion.div>
           )}
-          
+
           {step === "suggestions" && (
             <motion.div key="suggestions" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <Button 
-                variant="ghost" 
-                onClick={() => setStep("report")} 
+              <Button
+                variant="ghost"
+                onClick={() => setStep("report")}
                 className="mb-4"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
