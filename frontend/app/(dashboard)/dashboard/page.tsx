@@ -391,7 +391,6 @@ export default function DashboardLanding() {
           </div>
         </div>
       </div>
-      </div>
 
       {/* Bottom Disclaimer */}
       <div className="shrink-0 border-t border-border bg-muted/30 px-4 py-6 text-center">
