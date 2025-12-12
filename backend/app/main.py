@@ -39,17 +39,15 @@ def get_classifier_pipe():
 NUTRITION_PATH = BASE_DIR / "data" / "nutrition_db.json"
 GI_PATH = BASE_DIR / "data" / "glycemic_index.json"
 
-if NUTRITION_PATH.exists():
-    with open(NUTRITION_PATH) as f:
-        nutrition_db = json.load(f)
-else:
-    nutrition_db = {}
+def _load_json_or_empty(path: Path):
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
-if GI_PATH.exists():
-    with open(GI_PATH) as f:
-        gi_db = json.load(f)
-else:
-    gi_db = {}
+nutrition_db = _load_json_or_empty(NUTRITION_PATH)
+gi_db = _load_json_or_empty(GI_PATH)
 
 
 def get_food_info(food_name: str, confidence: float):
