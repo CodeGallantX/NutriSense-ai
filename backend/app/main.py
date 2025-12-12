@@ -537,6 +537,11 @@ def analyze_image(img: Image.Image, user_health: dict):
             for res in classifier_results[:5]:  # top 5 from classifier
                 food_name = res["label"]
                 conf_val = float(res["score"])
+                
+                # Filter: drop classifier items below 0.3 confidence
+                if conf_val < 0.3:
+                    continue
+                
                 if food_name not in results_dict or conf_val > results_dict[food_name]["confidence"]:
                     info = _handle_detection(results_dict, food_name, conf_val, user_health)
                     info["source"] = "Classifier" if food_name not in results_dict else "YOLO+Classifier"

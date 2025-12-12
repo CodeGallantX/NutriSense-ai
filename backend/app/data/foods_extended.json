@@ -17354,5 +17354,184 @@
       "salad",
       "tzatziki"
     ]
+  },
+  {
+    "name": "milkshake",
+    "calories": 350,
+    "carbs": 55,
+    "protein": 8,
+    "fat": 9,
+    "fiber": 1,
+    "glycemic_index": 60,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "burger",
+      "fries",
+      "dessert"
+    ]
+  },
+  {
+    "name": "strawberry milkshake",
+    "calories": 380,
+    "carbs": 60,
+    "protein": 9,
+    "fat": 10,
+    "fiber": 2,
+    "glycemic_index": 62,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "burger",
+      "fries",
+      "sandwich"
+    ]
+  },
+  {
+    "name": "chocolate milkshake",
+    "calories": 420,
+    "carbs": 65,
+    "protein": 10,
+    "fat": 12,
+    "fiber": 2,
+    "glycemic_index": 58,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "burger",
+      "fries",
+      "dessert"
+    ]
+  },
+  {
+    "name": "vanilla milkshake",
+    "calories": 340,
+    "carbs": 52,
+    "protein": 8,
+    "fat": 9,
+    "fiber": 0,
+    "glycemic_index": 60,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "burger",
+      "fries",
+      "sandwich"
+    ]
+  },
+  {
+    "name": "strawberry milkshake small",
+    "calories": 280,
+    "carbs": 45,
+    "protein": 7,
+    "fat": 7,
+    "fiber": 1,
+    "glycemic_index": 60,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "snack",
+      "dessert"
+    ]
+  },
+  {
+    "name": "chocolate milkshake large",
+    "calories": 580,
+    "carbs": 85,
+    "protein": 13,
+    "fat": 16,
+    "fiber": 3,
+    "glycemic_index": 58,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "burger",
+      "fries"
+    ]
+  },
+  {
+    "name": "vanilla milkshake medium",
+    "calories": 420,
+    "carbs": 62,
+    "protein": 10,
+    "fat": 11,
+    "fiber": 1,
+    "glycemic_index": 60,
+    "GI_category": "medium",
+    "suitable_for": [
+      "healthy"
+    ],
+    "incompatible_with": [
+      "diabetes",
+      "lactose_intolerant",
+      "weight_loss"
+    ],
+    "common_pairings": [
+      "burger",
+      "sandwich"
+    ]
+  },
+  {
+    "name": "fruit smoothie",
+    "calories": 220,
+    "carbs": 45,
+    "protein": 5,
+    "fat": 3,
+    "fiber": 4,
+    "glycemic_index": 50,
+    "GI_category": "low",
+    "suitable_for": [
+      "healthy",
+      "type2"
+    ],
+    "incompatible_with": [
+      "type1"
+    ],
+    "common_pairings": [
+      "breakfast",
+      "snack"
+    ]
   }
 ]
