@@ -127,7 +127,7 @@ export default function Dashboard({ userProfile, selectedGoal }: {
       <div className="min-h-screen bg-white">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="mb-12">
-            <h1 className="text-2xl font-medium text-gray-900 mb-2">Health Tracker</h1>
+            <h1 className="text-3xl font-serif text-gray-900 mb-2">Your Health Tracker</h1>
             <p className="text-gray-500">Choose what you&apos;d like to track</p>
           </div>
 
