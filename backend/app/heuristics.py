@@ -18,7 +18,8 @@ class FoodHeuristics:
     def __init__(
         self,
         nutrition_db_path: str = None,
-        glycemic_index_path: str = None
+        glycemic_index_path: str = None,
+        foods_extended_path: Optional[str] = None,
     ):
         # Set default paths
         if nutrition_db_path is None:
@@ -28,13 +29,24 @@ class FoodHeuristics:
         if glycemic_index_path is None:
             base_path = Path(__file__).parent
             glycemic_index_path = base_path / "data" / "glycemic_index.json"
+
+        if foods_extended_path is None:
+            base_path = Path(__file__).parent
+            foods_extended_path = base_path / "data" / "foods_extended.json"
         
         # Load databases
         self.nutrition_db = self._load_json(nutrition_db_path)
         self.glycemic_index_db = self._load_json(glycemic_index_path)
+        # foods_extended.json is a list; index by normalized name for quick lookup.
+        foods_extended = self._load_json(foods_extended_path)
+        self.foods_extended_index = {
+            self._normalize_food_name(item.get("name", "")): item
+            for item in foods_extended or []
+        }
         
         logger.info(f"Loaded {len(self.nutrition_db)} nutrition entries")
         logger.info(f"Loaded {len(self.glycemic_index_db)} glycemic index entries")
+        logger.info(f"Loaded {len(self.foods_extended_index)} extended food entries")
     
     def _load_json(self, path: Path) -> Dict:
         """Load JSON file."""
@@ -76,17 +88,30 @@ class FoodHeuristics:
         # Normalize name
         normalized = self._normalize_food_name(food_name)
         
-        # Try exact match first
+        # Try curated DB exact match first
         for key, value in self.nutrition_db.items():
             if self._normalize_food_name(key) == normalized:
                 return value
         
-        # Try partial match
+        # Try curated DB partial match
         for key, value in self.nutrition_db.items():
             if normalized in self._normalize_food_name(key) or \
                self._normalize_food_name(key) in normalized:
                 logger.debug(f"Partial match: '{food_name}' -> '{key}'")
                 return value
+
+        # Fallback to extended dataset (contains macros & GI_category)
+        ext_entry = self.foods_extended_index.get(normalized)
+        if ext_entry:
+            return {
+                "calories": ext_entry.get("calories", 0),
+                "carbs": ext_entry.get("carbs", 0),
+                "protein": ext_entry.get("protein", 0),
+                "fat": ext_entry.get("fat", 0),
+                "fiber": ext_entry.get("fiber", 0),
+                "flags": [],
+                "warnings": {},
+            }
         
         # No match found - return defaults
         logger.warning(f"No nutrition data found for: {food_name}")
@@ -96,16 +121,21 @@ class FoodHeuristics:
         """Find glycemic index for food name."""
         normalized = self._normalize_food_name(food_name)
         
-        # Try exact match
+        # Try curated GI exact match
         for key, value in self.glycemic_index_db.items():
             if self._normalize_food_name(key) == normalized:
                 return value
         
-        # Try partial match
+        # Try curated GI partial match
         for key, value in self.glycemic_index_db.items():
             if normalized in self._normalize_food_name(key) or \
                self._normalize_food_name(key) in normalized:
                 return value
+
+        # Fallback to extended dataset
+        ext_entry = self.foods_extended_index.get(normalized)
+        if ext_entry:
+            return ext_entry.get("glycemic_index")
         
         return None
     
