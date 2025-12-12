@@ -404,7 +404,7 @@ export default function DashboardPage() {
 
         {/* Sticky Bottom Section with Input and Options */}
         <div
-          className={`sticky bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
+          className={`fixed bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
             isScrolled ? "shadow-lg" : ""
           }`}
         >

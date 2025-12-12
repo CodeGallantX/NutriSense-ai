@@ -276,9 +276,9 @@ export default function DashboardLanding() {
 
         {/* Fixed Bottom Section with Input and Options (same as chat) */}
         <div
-          className={`fixed bottom-0 left-0 right-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
+          className={`fixed bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
             isScrolled ? "shadow-lg" : ""
-          } z-50 flex justify-center`}
+          }`}
         >
           {/* Feature Action Buttons */}
           <div className="w-full max-w-3xl px-4">
