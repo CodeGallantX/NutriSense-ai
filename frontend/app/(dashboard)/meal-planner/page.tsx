@@ -724,8 +724,8 @@ function NutritionReportStep({
                 {report.nutritionScore > 80
                   ? "Excellent variety! You have a well-balanced inventory."
                   : report.nutritionScore > 60
-                  ? "Good start! Consider adding more variety."
-                  : "Consider adding more food groups for balanced nutrition."}
+                    ? "Good start! Consider adding more variety."
+                    : "Consider adding more food groups for balanced nutrition."}
               </p>
             </CardContent>
           </Card>
@@ -752,8 +752,8 @@ function NutritionReportStep({
                 {report.wasteRisk > 70
                   ? "High risk! Use perishable items immediately."
                   : report.wasteRisk > 40
-                  ? "Moderate risk. Plan meals around expiring items."
-                  : "Low risk. Your inventory is well-managed."}
+                    ? "Moderate risk. Plan meals around expiring items."
+                    : "Low risk. Your inventory is well-managed."}
               </p>
             </CardContent>
           </Card>
