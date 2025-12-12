@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Home,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   PanelsTopLeft,
   X,
   Star,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,12 +22,29 @@ import {
 } from "@/components/ui/tooltip";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createConversation } from "@/app/actions/chat";
+
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+};
+
+type Conversation = {
+  id: string;
+  created_at: string;
+  title?: string;
+};
 
 type SidebarProps = {
   onNavigate?: () => void;
+  user: User;
+  conversations: Conversation[];
 };
 
-export default function Sidebar({ onNavigate }: SidebarProps) {
+export default function Sidebar({ onNavigate, user, conversations }: SidebarProps) {
+  const router = useRouter();
   const pathname = usePathname();
 
   const [collapsed, setCollapsed] = useState(true);
@@ -39,13 +58,10 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     { id: "food-database", label: "Food Database", icon: Database, href: "/food-database" },
   ];
 
-  const chatHistory = [
-    { id: 1, name: "Weight loss plan", unread: true },
-    { id: 2, name: "Gut health questions" },
-    { id: 3, name: "Allergy concerns" },
-    { id: 4, name: "Meal prep ideas" },
-    { id: 5, name: "Fitness routine" },
-  ];
+  const handleNewChat = async () => {
+    const newId = await createConversation(user.id);
+    router.push(`/dashboard/${newId}`);
+  };
 
   const handleLogoAreaClick = () => {
     if (collapsed) {
@@ -63,6 +79,11 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     if (collapsed) {
       setIsHoveringLogo(false);
     }
+  };
+
+  const getActiveIndicator = (isActive: boolean) => {
+    if (!isActive) return null;
+    return <div className="w-2 h-2 rounded-full bg-primary shrink-0" />;
   };
 
   return (
@@ -98,7 +119,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                   href="/"
                 >
                   <h1 className="text-xl font-serif text-gray-900 text-center">
-                    AI
+                    NS
                   </h1>
                 </Link>
 
@@ -164,19 +185,18 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
       <nav className="flex-1 p-3 space-y-2 overflow-hidden hover:overflow-y-auto">
         {navItems.map(({ id, label, icon: Icon, href }) => {
           const isActive =
-            (id === "dashboard" && pathname === "/") ||
+            (id === "dashboard" && pathname.startsWith("/dashboard")) ||
             (id === "health-diary" && pathname.startsWith("/health-diary")) ||
             (id === "meal-planner" && pathname.startsWith("/meal-planner")) ||
             (id === "nutrition-guide" && pathname.startsWith("/nutrition-guide")) ||
-            (id === "food-database" && pathname.startsWith("/food-database")) ||
-            (id === "health-chat" && pathname.startsWith("/health-chat"));
+            (id === "food-database" && pathname.startsWith("/food-database"));
 
           // Wrap the button with Tooltip when sidebar is collapsed
           const buttonContent = (
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start gap-3 transition-colors cursor-pointer",
+                "w-full justify-start gap-3 transition-colors cursor-pointer relative",
                 collapsed ? "px-4 lg:justify-center lg:px-2" : "px-4",
                 isActive && "bg-gray-200 text-gray-900",
                 "hover:bg-gray-100"
@@ -191,6 +211,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
               >
                 {label}
               </span>
+              {/* No indicator for nav items */}
             </Button>
           );
 
@@ -214,23 +235,39 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
         {!collapsed && (
           <div className="pt-6 border-t border-gray-200 mt-4">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-2">
-              Chat History
+              Chats
             </h3>
+            <Button
+              variant="ghost"
+              className="w-full justify-start mb-2 text-sm"
+              onClick={handleNewChat}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Chat
+            </Button>
             <div className="space-y-1">
-              {chatHistory.map((chat) => (
-                <Link
-                  key={chat.id}
-                  href={`/health-chat/${chat.id}`}
-                  className="flex items-center justify-between px-4 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors"
-                >
-                  <span className="truncate text-gray-700">
-                    {chat.name}
-                  </span>
-                  {chat.unread && (
-                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                  )}
-                </Link>
-              ))}
+              {conversations.map((conv) => {
+                const isActive = pathname === `/dashboard/${conv.id}`;
+                const chatTitle = conv.title || `Chat ${new Date(conv.created_at).toLocaleDateString()}`;
+                return (
+                  <Link
+                    key={conv.id}
+                    href={`/dashboard/${conv.id}`}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-2 rounded-md hover:bg-gray-100 text-sm transition-colors",
+                      isActive && "bg-gray-100 text-gray-900"
+                    )}
+                  >
+                    <span className="truncate text-gray-700 flex-1">
+                      {chatTitle}
+                    </span>
+                    {getActiveIndicator(isActive)}
+                  </Link>
+                );
+              })}
+              {conversations.length === 0 && (
+                <p className="px-4 py-2 text-sm text-gray-500">No chats yet. Start a new one!</p>
+              )}
             </div>
           </div>
         )}

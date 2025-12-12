@@ -5,7 +5,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Sparkles, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { sendFoodAnalysisMessage } from "@/app/actions/chat";
+import { sendFoodAnalysisMessage, createConversation } from "@/app/actions/chat";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // Define BACKEND_API (use env var)
@@ -20,6 +20,7 @@ interface AnalyzerModalProps {
     conversationId: string
   ) => void;
   userId: string;
+  conversationId?: string;
 }
 
 export default function AnalyzerModal({
@@ -27,6 +28,7 @@ export default function AnalyzerModal({
   onClose,
   onSendToChat,
   userId,
+  conversationId,
 }: AnalyzerModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
@@ -105,12 +107,17 @@ export default function AnalyzerModal({
   };
 
   const analyzeAndSend = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage || !userId) return;
 
     setIsAnalyzing(true);
     setError(null);
 
     try {
+      let convId = conversationId;
+      if (!convId) {
+        convId = await createConversation(userId);
+      }
+
       // Convert dataURL to File
       const file = dataURLToFile(selectedImage, `food-${Date.now()}.png`);
       const imageUrl = await uploadToSupabaseStorage(
@@ -141,13 +148,13 @@ export default function AnalyzerModal({
       console.log("Scan Output:", scanOutput);
 
       // Call new server action for food analysis message
-      const { conversationId, assistantResponse } =
-        await sendFoodAnalysisMessage(userId, userPrompt, scanOutput, imageUrl);
+      const { assistantResponse } =
+        await sendFoodAnalysisMessage(userId, convId, userPrompt, scanOutput, imageUrl);
 
       const userMessage = `${userPrompt} [Food Image Attached]`;
 
       // Send to chat
-      onSendToChat(userMessage, assistantResponse, conversationId);
+      onSendToChat(userMessage, assistantResponse, convId);
       // Reset and close
       resetAnalysis();
       onClose();

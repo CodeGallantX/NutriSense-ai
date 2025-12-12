@@ -1,9 +1,10 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+// app/dashboard/[conversationId]/page.tsx
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/dashboard/page.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Camera,
@@ -21,14 +22,19 @@ import AnalyzerModal from "@/components/analyzer-modal";
 import {
   getUserProfile,
   sendUserMessage,
+  getConversationMessages,
   createConversation,
+  getUserConversations,
 } from "@/app/actions/chat";
 import { Profile } from "@/types/database";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import MarkdownMessage from "@/components/markdown-message";
 
-export default function DashboardLanding() {
-  const supabase = getSupabaseBrowserClient();
+export default function DashboardPage() {
+  const params = useParams();
   const router = useRouter();
+  const supabase = getSupabaseBrowserClient();
+  const conversationId = params?.conversationId as string;
   const [userId, setUserId] = useState<string | "">("");
   const [messages, setMessages] = useState<
     Array<{
@@ -45,11 +51,10 @@ export default function DashboardLanding() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showAnalyzer, setShowAnalyzer] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [conversationId, setConversationId] = useState<string>(""); 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initial welcome message for typing effect
+  // Initial welcome message for typing effect (for diabetes users)
   const initialMessage = "Hello! I'm your diabetes health assistant. I can help you track meals, analyze nutrition, and manage your blood sugar levels. How can I assist you today?";
 
   // Fetch user on mount
@@ -67,49 +72,100 @@ export default function DashboardLanding() {
     fetchUser();
   }, [supabase]);
 
-  // Fetch profile and show initial message when userId changes
+  // Fetch profile, validate conv, messages when userId or conversationId changes
   useEffect(() => {
     const fetchData = async () => {
-      if (!userId || hasInitialized) return;
+      if (!userId || !conversationId || hasInitialized) return;
+
+      // Validate conv belongs to user
+      const convs = await getUserConversations(userId);
+      const validConv = convs.find(c => c.id === conversationId);
+      if (!validConv) {
+        router.replace('/dashboard');
+        return;
+      }
 
       const userProfile = await getUserProfile(userId);
       setProfile(userProfile);
 
-      // Always show initial typing effect on landing (no real conv yet)
-      setIsTyping(true);
-      let index = 0;
-      const tempId = "initial-msg";
+      const convMessages = await getConversationMessages(conversationId);
       
-      // Start with empty message
-      setMessages([{
-        id: tempId,
-        role: "assistant" as const,
-        content: "",
-        created_at: new Date().toISOString(),
-      }]);
+      if (convMessages.length === 0) {
+        // If no messages, show initial typing effect
+        if (userProfile?.has_diabetes) {
+          setIsTyping(true);
+          let index = 0;
+          const tempId = "initial-msg";
+          
+          // Start with empty message
+          setMessages([{
+            id: tempId,
+            role: "assistant" as const,
+            content: "",
+            created_at: new Date().toISOString(),
+          }]);
 
-      // Type out the initial message
-      const timer = setInterval(() => {
-        if (index < initialMessage.length) {
-          setMessages(prev =>
-            prev.map(msg =>
-              msg.id === tempId
-                ? { ...msg, content: initialMessage.slice(0, index + 1) }
-                : msg
-            )
-          );
-          index++;
+          // Type out the initial message
+          const timer = setInterval(() => {
+            if (index < initialMessage.length) {
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === tempId
+                    ? { ...msg, content: initialMessage.slice(0, index + 1) }
+                    : msg
+                )
+              );
+              index++;
+            } else {
+              setIsTyping(false);
+              clearInterval(timer);
+            }
+          }, 30);
+
+          // Save a dummy message to start the conv (optional)
+          setTimeout(async () => {
+            await sendUserMessage(userId, conversationId, "Start chat");
+          }, 500);
         } else {
-          setIsTyping(false);
-          clearInterval(timer);
+          // For non-diabetes users, show welcome message with typing effect
+          setIsTyping(true);
+          const welcomeMsg = "Welcome! I'm your health assistant. I can help you with nutrition and wellness advice. How can I assist you today?";
+          let index = 0;
+          const tempId = "welcome-msg";
+          
+          setMessages([{
+            id: tempId,
+            role: "assistant" as const,
+            content: "",
+            created_at: new Date().toISOString(),
+          }]);
+
+          const timer = setInterval(() => {
+            if (index < welcomeMsg.length) {
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === tempId
+                    ? { ...msg, content: welcomeMsg.slice(0, index + 1) }
+                    : msg
+                )
+              );
+              index++;
+            } else {
+              setIsTyping(false);
+              clearInterval(timer);
+            }
+          }, 30);
         }
-      }, 30);
+      } else {
+        // If we have existing messages, show them
+        setMessages(convMessages);
+      }
       
       setHasInitialized(true);
     };
 
     fetchData();
-  }, [userId, hasInitialized, initialMessage]);
+  }, [userId, conversationId, hasInitialized, initialMessage]);
 
   // Handle scroll detection
   useEffect(() => {
@@ -128,15 +184,11 @@ export default function DashboardLanding() {
   }, []);
 
   const handleSend = async () => {
-    if (!input.trim() || !userId || conversationId) return; 
+    if (!input.trim() || !userId || !conversationId) return;
     const content = input;
     setInput("");
 
-    // Create conversation first
-    const newConvId = await createConversation(userId);
-    setConversationId(newConvId);
-
-    // Add optimistic user message (local only, will redirect)
+    // Add optimistic user message
     const tempUserMsgId = `temp-user-${Date.now()}`;
     setMessages(prev => [
       ...prev,
@@ -148,24 +200,96 @@ export default function DashboardLanding() {
       },
     ]);
 
-    // Show typing indicator
+    // Show typing indicator for assistant
     setIsTyping(true);
 
     try {
-      // Send message to new conv and get response
-      const { assistantResponse } = await sendUserMessage(userId, newConvId, content);
+      // Send message and get response
+      const { assistantResponse } = await sendUserMessage(userId, conversationId, content);
       
-      // Since we're redirecting, no need for typing effect here
-      // Redirect to new chat page
-      router.push(`/dashboard/${newConvId}`);
+      // Add assistant response with typing effect
+      const tempAssistantMsgId = `temp-assistant-${Date.now()}`;
+      const assistantText = assistantResponse || "I've processed your request.";
+      
+      // Add empty assistant message
+      setMessages(prev => [
+        ...prev,
+        {
+          id: tempAssistantMsgId,
+          role: "assistant" as const,
+          content: "",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      // Type out the assistant response
+      let index = 0;
+      const typingInterval = setInterval(() => {
+        if (index < assistantText.length) {
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === tempAssistantMsgId
+                ? { ...msg, content: assistantText.slice(0, index + 1) }
+                : msg
+            )
+          );
+          index++;
+        } else {
+          clearInterval(typingInterval);
+          setIsTyping(false);
+          
+          // Refresh messages from DB to get proper IDs
+          setTimeout(async () => {
+            const updatedMessages = await getConversationMessages(conversationId);
+            setMessages(updatedMessages);
+          }, 100);
+        }
+      }, 20);
     } catch (err) {
       console.error("Send error:", err);
       setIsTyping(false);
-      setConversationId(""); // Reset
-      // Remove temp user msg
-      setMessages(prev => prev.filter(m => m.id !== tempUserMsgId));
-      // Optionally show error
+      
+      // Remove temp messages and show error
+      setMessages(prev => 
+        prev.filter(m => !m.id.startsWith('temp-'))
+      );
+      
+      // Show error message with typing effect
+      const errorMsgId = `error-${Date.now()}`;
+      const errorText = "Sorry, I encountered an error. Please try again.";
+      
+      setMessages(prev => [
+        ...prev,
+        {
+          id: errorMsgId,
+          role: "assistant" as const,
+          content: "",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      let index = 0;
+      const errorInterval = setInterval(() => {
+        if (index < errorText.length) {
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === errorMsgId
+                ? { ...msg, content: errorText.slice(0, index + 1) }
+                : msg
+            )
+          );
+          index++;
+        } else {
+          clearInterval(errorInterval);
+        }
+      }, 20);
     }
+  };
+
+  const handleNewChat = async () => {
+    if (!userId) return;
+    const newId = await createConversation(userId);
+    router.push(`/dashboard/${newId}`);
   };
 
   const handleSendToChat = async (
@@ -173,9 +297,13 @@ export default function DashboardLanding() {
     aiResponse: string,
     convId: string
   ) => {
-    setConversationId(convId);
-    // Redirect to chat
-    router.push(`/dashboard/${convId}`);
+    // If convId is new, redirect; else just refresh
+    if (convId !== conversationId) {
+      router.push(`/dashboard/${convId}`);
+    } else {
+      const updatedMessages = await getConversationMessages(convId);
+      setMessages(updatedMessages);
+    }
     setShowAnalyzer(false);
   };
 
@@ -183,29 +311,40 @@ export default function DashboardLanding() {
     fileInputRef.current?.click();
   };
 
-  const isReadyToSend = !conversationId && !isTyping;
+  // Hide header on this page (as per request: "when new conv, hide header")
+  const showHeader = false;
 
   return (
     <div className="min-h-screen bg-linear-to-br from-teal-50 via-white to-blue-50 flex flex-col">
-      {/* Top Section - Centered Heading (shown on landing) */}
-      <div className="shrink-0 py-12 px-4 text-center border-b border-border">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-center mb-6">
-            <div className="w-16 h-16 flex items-center justify-center">
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
+      {/* Top Section - Centered Heading (conditionally hidden) */}
+      {/* {!showHeader && (
+        <div className="shrink-0 py-12 px-4 text-center border-b border-border">
+          <div className="max-w-2xl mx-auto flex justify-between items-center mb-6">
+            <Button variant="ghost" onClick={() => router.push('/dashboard')} size="sm">
+              ← Back to Dashboard
+            </Button>
+            <Button onClick={handleNewChat} variant="outline" size="sm">
+              New Chat
+            </Button>
           </div>
-          <h1 className="text-4xl md:text-5xl text-foreground mb-3 text-balance font-serif">
-            Manage Your Health Journey
-          </h1>
-          <p className="text-muted-foreground text-base md:text-lg text-pretty">
-            Track your nutrition, scan meals with AI, and get personalized
-            insights for better diabetes management.
-          </p>
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <h1 className="text-4xl md:text-5xl text-foreground mb-3 text-balance font-serif">
+              Manage Your Health Journey
+            </h1>
+            <p className="text-muted-foreground text-base md:text-lg text-pretty">
+              Track your nutrition, scan meals with AI, and get personalized
+              insights for better diabetes management.
+            </p>
+          </div>
         </div>
-      </div>
+      )} */}
 
-      {/* Middle Section - Chat Interface (same as chat page) */}
+      {/* Middle Section - Chat Interface */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Chat Messages Area */}
         <div
@@ -232,16 +371,17 @@ export default function DashboardLanding() {
                     }
                   `}
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.content}
-                    {/* Show typing cursor for the last assistant message if typing */}
-                    {message.role === "assistant" && 
-                     index === messages.length - 1 && 
-                     isTyping && 
-                     message.id?.startsWith('temp-') && (
-                      <span className="animate-pulse">|</span>
-                    )}
-                  </p>
+                  <div className="prose prose-sm max-w-none">
+  <MarkdownMessage content={message.content} />
+  
+  {/* Show typing cursor only during live typing effect */}
+  {message.role === "assistant" &&
+    index === messages.length - 1 &&
+    isTyping &&
+    message.id?.startsWith('temp-') && (
+      <span className="animate-pulse inline-block w-0.5 h-5 bg-gray-600 ml-0.5" />
+    )}
+</div>
                 </div>
               </div>
             ))}
@@ -262,7 +402,7 @@ export default function DashboardLanding() {
           </div>
         </div>
 
-        {/* Sticky Bottom Section with Input and Options (same as chat) */}
+        {/* Sticky Bottom Section with Input and Options */}
         <div
           className={`sticky bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
             isScrolled ? "shadow-lg" : ""
@@ -285,7 +425,6 @@ export default function DashboardLanding() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                disabled={!isReadyToSend}
               >
                 <Camera className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium">Scan Food</span>
@@ -295,7 +434,6 @@ export default function DashboardLanding() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                disabled={!isReadyToSend}
               >
                 <Utensils className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium">Meal Planner</span>
@@ -305,7 +443,6 @@ export default function DashboardLanding() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                disabled={!isReadyToSend}
               >
                 <TrendingUp className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium">Analytics</span>
@@ -315,7 +452,6 @@ export default function DashboardLanding() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                disabled={!isReadyToSend}
               >
                 <Activity className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium">Blood Sugar</span>
@@ -325,7 +461,6 @@ export default function DashboardLanding() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                disabled={!isReadyToSend}
               >
                 <Calculator className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium">Calculator</span>
@@ -335,7 +470,6 @@ export default function DashboardLanding() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                disabled={!isReadyToSend}
               >
                 <Apple className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium">Food Database</span>
@@ -349,10 +483,10 @@ export default function DashboardLanding() {
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && isReadyToSend && handleSend()}
+                onKeyDown={(e) => e.key === "Enter" && !isTyping && handleSend()}
                 placeholder="Ask about nutrition, meals, or diabetes management..."
                 className="w-full rounded-lg shadow-none pl-16 pr-16 py-7 text-base focus-visible:ring-primary bg-white border border-gray-200 focus:border-primary"
-                disabled={!isReadyToSend || isTyping}
+                disabled={!userId || isTyping}
               />
 
               {/* Left icon inside input */}
@@ -361,7 +495,7 @@ export default function DashboardLanding() {
                 variant="ghost"
                 size="icon"
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 rounded-full h-9 w-9 hover:bg-gray-100"
-                disabled={!isReadyToSend || isTyping}
+                disabled={!userId || isTyping}
               >
                 <Upload className="w-4 h-4 text-muted-foreground" />
               </Button>
@@ -371,7 +505,7 @@ export default function DashboardLanding() {
                 onClick={handleSend}
                 size="icon"
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 rounded-lg h-9 w-9 bg-primary hover:bg-primary/90"
-                disabled={!isReadyToSend || !input.trim() || isTyping}
+                disabled={!userId || !input.trim() || isTyping}
               >
                 <Send className="w-4 h-4" />
               </Button>
@@ -390,7 +524,7 @@ export default function DashboardLanding() {
         </p>
       </div>
 
-      {/* Analyzer Modal - On landing, will create conv on send */}
+      {/* Analyzer Modal */}
       <AnalyzerModal
         isOpen={showAnalyzer}
         onClose={() => setShowAnalyzer(false)}
@@ -407,10 +541,10 @@ export default function DashboardLanding() {
         accept="image/*"
         onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (file && userId && !conversationId) {
-            // On landing, create conv first
-            const newId = await createConversation(userId);
-            router.push(`/dashboard/${newId}`);
+          if (file && userId) {
+            // Handle image upload (e.g., upload to storage, then send with image_url)
+            console.log("File selected:", file.name);
+            // Implement upload logic here if needed
           }
         }}
       />

@@ -18,10 +18,10 @@ export default function HomePage() {
           </p>
           <div className="flex gap-4 justify-center pt-4">
             <Button asChild size="lg" className="text-lg">
-              <Link href="/auth/signup">Get Started</Link>
+              <Link href="/signup">Get Started</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="text-lg bg-transparent">
-              <Link href="/auth/signin">Sign In</Link>
+              <Link href="/login">Sign In</Link>
             </Button>
           </div>
         </div>

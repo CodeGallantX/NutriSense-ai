@@ -1,6 +1,4 @@
-// components/ClientDashboard.tsx
-// New client component to handle state and UI (replaces the mixed logic in the original layout)
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import type React from "react";
@@ -9,6 +7,7 @@ import Sidebar from "@/components/sidebar";
 import Navbar from "@/components/navbar";
 
 type User = {
+  id: string;
   name: string;
   email: string;
   avatar: string;
@@ -16,10 +15,11 @@ type User = {
 
 interface ClientDashboardProps {
   user: User;
+  conversations: any[];
   children: React.ReactNode;
 }
 
-const ClientDashboard = ({ user, children }: ClientDashboardProps) => {
+const ClientDashboard = ({ user, conversations, children }: ClientDashboardProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -34,7 +34,11 @@ const ClientDashboard = ({ user, children }: ClientDashboardProps) => {
             ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
           `}
         >
-          <Sidebar onNavigate={() => setSidebarOpen(false)} />
+          <Sidebar 
+            user={user}
+            conversations={conversations}
+            onNavigate={() => setSidebarOpen(false)} 
+          />
         </div>
 
         {sidebarOpen && (
