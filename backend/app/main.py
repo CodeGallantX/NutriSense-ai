@@ -1001,7 +1001,8 @@ async def scan_food_yolo_mistral(
         # Step 1: YOLO Detection
         logger.info("Step 1: Running YOLO detection...")
         yolo_detector = get_yolo_detector()
-        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=640)
+        # Slightly lower confidence to improve recall on challenging images
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.20, imgsz=640)
         logger.info(f"YOLO detected {len(yolo_results)} items")
         
         # Step 2: Mistral Validation (optional - graceful fallback)
