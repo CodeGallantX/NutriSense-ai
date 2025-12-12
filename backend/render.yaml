@@ -9,7 +9,7 @@ services:
     autoDeploy: true
     envVars:
       - key: HF_TOKEN
-        value: ""
+        fromService: secret
       - key: YOLO_CONFIG_DIR
         value: "/tmp/Ultralytics"
       # - key: DATABASE_URL
