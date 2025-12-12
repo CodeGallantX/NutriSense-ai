@@ -7,9 +7,216 @@ import json
 import os
 import numpy as np
 from typing import List, Dict, Any
+from pydantic import BaseModel, Field
 from app.services.classification_service import classify_food
 
-app = FastAPI(title="NutriSense API", version="1.0")
+
+# --- Pydantic Models for Request/Response Schemas ---
+
+class FoodDetection(BaseModel):
+    name: str = Field(..., description="Name of detected food item")
+    confidence: float = Field(..., description="Detection confidence (0-1)")
+    calories: float | None = Field(None, description="Estimated calories per serving")
+    carbs: float | None = Field(None, description="Carbohydrates in grams")
+    protein: float | None = Field(None, description="Protein in grams")
+    fat: float | None = Field(None, description="Fat in grams")
+    fiber: float | None = Field(None, description="Dietary fiber in grams")
+    glycemic_index: int | None = Field(None, description="Glycemic index (0-100)")
+    flags: List[str] = Field(default_factory=list, description="Food characteristics (fried, spicy, carb-heavy, etc.)")
+    source: str = Field(..., description="Detection source: YOLO, YOLO-SEG, Classifier, or Heuristic")
+    advice: str = Field(..., description="Personalized nutrition advice based on health conditions")
+    health_warnings: Dict[str, str] = Field(default_factory=dict, description="Condition-specific warnings")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "Jollof Rice",
+                "confidence": 0.87,
+                "calories": 180,
+                "carbs": 35,
+                "protein": 4,
+                "fat": 3,
+                "fiber": 1,
+                "glycemic_index": 72,
+                "flags": ["carb-heavy", "starchy"],
+                "source": "YOLO",
+                "advice": "High GI – minimize for diabetes ⚠️ High GI - limit intake for diabetes",
+                "health_warnings": {"diabetes": "High GI; consider portion control"}
+            }
+        }
+
+
+class MealComponent(BaseModel):
+    meal_diversity: float = Field(..., description="Score 0-100: variety of foods detected")
+    nutrient_completeness: float = Field(..., description="Score 0-100: balance of macros and fiber")
+    glycemic_load_score: float = Field(..., description="Score 0-100: based on total glycemic load")
+    fiber_adequacy: float = Field(..., description="Score 0-100: adequacy relative to recommendations")
+    protein_adequacy: float = Field(..., description="Score 0-100: adequacy relative to recommendations")
+    fat_quality: float = Field(..., description="Score 0-100: presence of fried/fatty foods penalty")
+    sodium_penalty: float = Field(..., description="Score 0-100: salt/processed food penalty")
+    diabetes_friendly: float = Field(..., description="Score 0-100: suitability for diabetics")
+
+
+class MealSummary(BaseModel):
+    item_count: int = Field(..., description="Number of distinct food items detected")
+    total_calories: float = Field(..., description="Total estimated calories")
+    total_carbs: float = Field(..., description="Total carbohydrates in grams")
+    total_protein: float = Field(..., description="Total protein in grams")
+    total_fat: float = Field(..., description="Total fat in grams")
+    total_fiber: float = Field(..., description="Total dietary fiber in grams")
+    glycemic_load: float = Field(..., description="Estimated total glycemic load of the meal")
+    score: float = Field(..., description="Composite meal health score (0-100)")
+    quality: str = Field(..., description="Quality: Excellent/Good/Fair/Risky/Dangerous")
+    components: Dict[str, float] = Field(..., description="Breakdown of component scores")
+    recommendations: List[str] = Field(default_factory=list, description="Suggestions for meal improvement")
+    warnings: List[str] = Field(default_factory=list, description="Health alerts based on composition")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "item_count": 3,
+                "total_calories": 650,
+                "total_carbs": 85,
+                "total_protein": 35,
+                "total_fat": 18,
+                "total_fiber": 4,
+                "glycemic_load": 58,
+                "score": 72.3,
+                "quality": "Good",
+                "components": {
+                    "meal_diversity": 80,
+                    "nutrient_completeness": 75,
+                    "glycemic_load_score": 68,
+                    "fiber_adequacy": 60,
+                    "protein_adequacy": 85,
+                    "fat_quality": 70,
+                    "sodium_penalty": 65,
+                    "diabetes_friendly": 72
+                },
+                "recommendations": ["Add more vegetables for fiber", "Consider smaller portion of rice"],
+                "warnings": ["High glycemic load - monitor for diabetes"]
+            }
+        }
+
+
+class MealRecommendations(BaseModel):
+    healthy_alternatives: List[str] = Field(default_factory=list, description="Substitute suggestions")
+    portion_adjustments: List[str] = Field(default_factory=list, description="Portion sizing recommendations")
+    additions: List[str] = Field(default_factory=list, description="Suggested food additions for balance")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "healthy_alternatives": [
+                    "Replace fried plantain with boiled plantain (~40% fewer calories)",
+                    "Use brown rice instead of white rice (lower GI)"
+                ],
+                "portion_adjustments": [
+                    "Reduce Jollof Rice to 1 cup (high GI impact)",
+                    "Increase protein portion to 200g"
+                ],
+                "additions": [
+                    "Add cucumber or tomato salad for fiber",
+                    "Include leafy greens (spinach) for minerals"
+                ]
+            }
+        }
+
+class MealAnalysisResponse(BaseModel):
+    detected_items: List[FoodDetection] = Field(..., description="Individual detected food items")
+    meal_summary: MealSummary = Field(..., description="Aggregated meal-level nutrition and scores")
+    recommendations: MealRecommendations = Field(..., description="Actionable meal improvement suggestions")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "detected_items": [
+                    {
+                        "name": "Jollof Rice",
+                        "confidence": 0.87,
+                        "calories": 180,
+                        "carbs": 35,
+                        "protein": 4,
+                        "fat": 3,
+                        "fiber": 1,
+                        "glycemic_index": 72,
+                        "flags": ["carb-heavy", "starchy"],
+                        "source": "YOLO",
+                        "advice": "High GI - limit intake for diabetes",
+                        "health_warnings": {"diabetes": "High GI; consider portion control"}
+                    }
+                ],
+                "meal_summary": {
+                    "item_count": 1,
+                    "total_calories": 180,
+                    "total_carbs": 35,
+                    "total_protein": 4,
+                    "total_fat": 3,
+                    "total_fiber": 1,
+                    "glycemic_load": 25,
+                    "score": 62.0,
+                    "quality": "Fair",
+                    "components": {},
+                    "recommendations": ["Add protein and vegetables"],
+                    "warnings": []
+                },
+                "recommendations": {
+                    "healthy_alternatives": [],
+                    "portion_adjustments": [],
+                    "additions": ["Add grilled chicken (protein)", "Add salad (fiber)"]
+                }
+            }
+        }
+
+class DetectionCorrection(BaseModel):
+    original: str = Field(..., description="Original food name detected by model")
+    actual: str = Field(..., description="Correct food name provided by user")
+
+
+class HealthStatus(BaseModel):
+    status: str = Field(..., description="API status")
+    yolo_model_loaded: bool = Field(..., description="YOLO detection model availability")
+
+
+# --- FastAPI Application Setup ---
+
+app = FastAPI(
+    title="NutriSense AI",
+    description="🍽️ **Comprehensive Food Nutrition Analysis API**\n\n"
+               "Upload a meal image to get:\n\n"
+               "✅ **Detected Foods** - Individual items with confidence scores\n"
+               "✅ **Per-Item Nutrition** - Calories, macros, fiber, glycemic index\n"
+               "✅ **Meal-Level Analysis** - Aggregated nutrition and health scores\n"
+               "✅ **Health-Specific Warnings** - Diabetes, ulcer, hypertension, acid reflux alerts\n"
+               "✅ **Personalized Recommendations** - Meal alternatives, portions, additions\n\n"
+               "**Key Technologies:**\n"
+               "• **YOLOv8 Detection** - Fast, accurate food item detection\n"
+               "• **YOLOv8 Segmentation** (optional) - Pixel-perfect food separation\n"
+               "• **HuggingFace Classifier** - Fallback for ambiguous items\n"
+               "• **Multi-Component Scoring** - Diversity, completeness, GL, fiber, protein, fat quality, sodium\n"
+               "• **Hierarchical Analysis** - Primary detection + hierarchical classification + heuristics\n\n"
+               "**Supported Conditions:**\n"
+               "🩺 Diabetes | 🩺 Hypertension | 🩺 Ulcers | 🩺 Acid Reflux | 🩺 Weight Management",
+    version="2.0",
+    contact={
+        "name": "NutriSense Team",
+        "url": "https://github.com/meet-tola/NutriSense-ai"
+    },
+    openapi_tags=[
+        {
+            "name": "Health",
+            "description": "API status and health checks"
+        },
+        {
+            "name": "Food Detection",
+            "description": "Detect and analyze food items from images"
+        },
+        {
+            "name": "User Corrections",
+            "description": "Refine detected items and recalculate nutrition"
+        }
+    ]
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -456,35 +663,106 @@ def build_meal_analysis(foods: List[Dict[str, Any]], user_health: dict) -> dict:
     }
 
 # API Endpoints
-@app.get("/")
+@app.get("/", tags=["Health"], summary="API Status", response_model=dict)
 def root():
+    """Get API information and available endpoints."""
     return {
-        "message": "NutriSense API",
-        "endpoints": ["/health", "/scan-food/"]
+        "message": "NutriSense AI - Food Nutrition Analysis API",
+        "version": "2.0",
+        "endpoints": {
+            "documentation": [
+                "/docs (Swagger UI)",
+                "/redoc (ReDoc)"
+            ],
+            "health": ["/health"],
+            "food_analysis": [
+                "/scan-food/ (basic analysis)",
+                "/analyze-meal (flagship endpoint with full recommendations)"
+            ],
+            "user_interaction": [
+                "/confirm-detections/ (refine detected items)"
+            ]
+        }
     }
 
-@app.get("/health")
+
+@app.get("/health", tags=["Health"], summary="Health Check", response_model=HealthStatus)
 def health():
-    return {
-        "status": "ok",
-        "yolo_model_loaded": bool(_yolo_model is not None)
-    }
+    """
+    Check API health status and model availability.
+    
+    Returns:
+    - **status**: API operational status
+    - **yolo_model_loaded**: Whether YOLO detection model is ready
+    """
+    return HealthStatus(
+        status="ok",
+        yolo_model_loaded=bool(_yolo_model is not None)
+    )
 
-@app.post("/scan-food/")
+
+@app.post(
+    "/scan-food/",
+    tags=["Food Detection"],
+    summary="Basic Food Analysis",
+    response_model=MealAnalysisResponse,
+    responses={
+        200: {"description": "Successful meal analysis with nutrition and recommendations"},
+        400: {"description": "Invalid image format or request"},
+        500: {"description": "Server error during detection or analysis"}
+    }
+)
 async def scan_food(
-    file: UploadFile = File(...),
-    diabetes: bool = Form(False),
-    hypertension: bool = Form(False),
-    ulcer: bool = Form(False),
-    weight_loss: bool = Form(False)
+    file: UploadFile = File(..., description="Food image file (JPEG, PNG, etc.)"),
+    diabetes: bool = Form(False, description="User has diabetes"),
+    hypertension: bool = Form(False, description="User has hypertension"),
+    ulcer: bool = Form(False, description="User has ulcers"),
+    weight_loss: bool = Form(False, description="User is managing weight loss")
 ):
     """
     Analyze a food image and provide comprehensive nutrition analysis.
     
-    Returns:
-    - Individual food items detected with nutrition info
-    - Meal-level totals (calories, macros, glycemic load)
-    - Balanced meal score and recommendations
+    **Input:**
+    - **file**: Image of a meal or food (multipart/form-data)
+    - **diabetes**: Check for high-GI and high-carb warnings
+    - **hypertension**: Flag high-sodium foods
+    - **ulcer**: Alert on irritating foods (spicy, fatty)
+    - **weight_loss**: Flag high-calorie items
+    
+    **Output:**
+    Returns `MealAnalysisResponse` containing:
+    - **detected_items**: Each food with nutrition facts and per-food advice
+    - **meal_summary**: Aggregated totals, composite score (0-100), quality rating (Excellent/Good/Fair/Risky/Dangerous)
+    - **recommendations**: Healthy alternatives, portion adjustments, and suggested additions
+    
+    **Example Response:**
+    ```json
+    {
+      "detected_items": [
+        {
+          "name": "Jollof Rice",
+          "confidence": 0.87,
+          "calories": 180,
+          "carbs": 35,
+          "protein": 4,
+          "fiber": 1,
+          "glycemic_index": 72,
+          "flags": ["carb-heavy", "starchy"],
+          "source": "YOLO"
+        }
+      ],
+      "meal_summary": {
+        "total_calories": 350,
+        "score": 68.5,
+        "quality": "Fair",
+        "recommendations": ["Add more protein", "Add vegetables for fiber"]
+      },
+      "recommendations": {
+        "healthy_alternatives": ["Swap fried chicken -> grilled"],
+        "portion_adjustments": ["Reduce high-GI carbs"]
+      }
+    }
+    ```
     """
     user_health = {
         "diabetes": diabetes, 
@@ -500,18 +778,60 @@ async def scan_food(
     return result
 
 
-@app.post("/analyze-meal")
+@app.post(
+    "/analyze-meal",
+    tags=["Food Detection"],
+    summary="Flagship Meal Analysis (Comprehensive)",
+    response_model=MealAnalysisResponse,
+    responses={
+        200: {"description": "Comprehensive meal analysis with all health conditions"},
+        400: {"description": "Invalid image or request parameters"},
+        500: {"description": "Detection or analysis error"}
+    }
+)
 async def analyze_meal(
-    file: UploadFile = File(...),
-    diabetes: bool = Form(False),
-    hypertension: bool = Form(False),
-    ulcer: bool = Form(False),
-    weight_loss: bool = Form(False),
-    acid_reflux: bool = Form(False)
+    file: UploadFile = File(..., description="Food image file (JPEG, PNG, etc.)"),
+    diabetes: bool = Form(False, description="User has diabetes"),
+    hypertension: bool = Form(False, description="User has hypertension"),
+    ulcer: bool = Form(False, description="User has ulcers"),
+    weight_loss: bool = Form(False, description="User is managing weight loss"),
+    acid_reflux: bool = Form(False, description="User has acid reflux (GERD)")
 ):
     """
-    Flagship endpoint: combined detection, nutrition, GI, scoring, recommendations.
-    Returns per-item nutrition, GI, per-food flags, meal-level scores, and suggestions.
+    **Flagship endpoint** - Comprehensive meal analysis with all health conditions.
+    
+    This is the recommended endpoint for complete nutritional and health analysis.
+    
+    **Input:**
+    - **file**: High-quality food image for best detection
+    - **diabetes**: GI and carb warnings for blood sugar management
+    - **hypertension**: Sodium and processed food alerts
+    - **ulcer**: Irritating food warnings (spicy, fried, acidic)
+    - **weight_loss**: Calorie and macro density alerts
+    - **acid_reflux**: Trigger foods (spicy, fatty, acidic)
+    
+    **Detection Flow:**
+    1. Primary: YOLOv8 detection (or YOLOv8-seg if available for segmentation)
+    2. Fallback: HuggingFace classifier if confidence is low
+    3. Heuristic: Missing ingredient estimation (protein sides, vegetables)
+    
+    **Output - MealAnalysisResponse:**
+    - **detected_items**: Up to 5 foods (sorted by confidence) with:
+      - Nutrition: calories, carbs, protein, fat, fiber
+      - Health: glycemic index, flags (fried/spicy/etc), personalized advice
+    - **meal_summary**: Composite meal health score (0-100) with:
+      - Component scores (diversity, completeness, GL, fiber, protein, fat, sodium, diabetes-friendly)
+      - Quality rating: Excellent (85+) | Good (70-84) | Fair (50-69) | Risky (30-49) | Dangerous (<30)
+    - **recommendations**: Actionable suggestions:
+      - Healthy alternatives (swap fried for grilled, etc.)
+      - Portion adjustments (reduce high-GI carbs)
+      - Additions (add protein, fiber)
+    
+    **Use Cases:**
+    - 📸 Food logging for health tracking apps
+    - 🏥 Personalized meal planning for diabetics/hypertensives
+    - 💪 Fitness and nutrition coaching
+    - 🤖 Chatbot integration for meal recommendations
     """
     user_health = {
         "diabetes": diabetes,
@@ -527,31 +847,72 @@ async def analyze_meal(
     return result
 
 
-@app.post("/confirm-detections/")
+@app.post(
+    "/confirm-detections/",
+    tags=["User Corrections"],
+    summary="Refine Detections",
+    response_model=MealAnalysisResponse,
+    responses={
+        200: {"description": "Corrected nutrition analysis"},
+        400: {"description": "Invalid correction format"},
+        500: {"description": "Analysis error after correction"}
+    }
+)
 async def confirm_detections(
     detected_items: List[Dict[str, Any]],
-    corrections: List[Dict[str, str]]
+    corrections: List[DetectionCorrection]
 ):
     """
     Apply user-provided corrections to detected items and recompute nutrition.
-    corrections: list of {"original": "Jollof Rice", "actual": "Fried Rice"}
+    
+    **Purpose:** Allow users to refine model predictions if they're inaccurate.
+    
+    **Input:**
+    - **detected_items**: Original detection results from /analyze-meal or /scan-food/
+    - **corrections**: List of `{"original": "detected_name", "actual": "correct_name"}` entries
+    
+    **Example Request:**
+    ```json
+    {
+      "detected_items": [...],
+      "corrections": [
+        {"original": "Jollof Rice", "actual": "Fried Rice"},
+        {"original": "Steamed Fish", "actual": "Grilled Tilapia"}
+      ]
+    }
+    ```
+    
+    **Output:** Updated `MealAnalysisResponse` with corrected nutrition and scores.
+    
+    **Workflow:**
+    1. Send detection results and user corrections
+    2. API remaps food names and recalculates nutrition
+    3. Meal score and recommendations are updated
+    4. Use for iterative refinement in interactive UI
     """
-    correction_map = {c.get("original"): c.get("actual") for c in corrections if c.get("original") and c.get("actual")}
+    correction_map = {
+        c.get("original"): c.get("actual") 
+        for c in corrections 
+        if isinstance(c, dict) and c.get("original") and c.get("actual")
+    }
     updated_items = []
     for item in detected_items:
         name = item.get("name")
         new_name = correction_map.get(name, name)
         confidence = item.get("confidence", 0.5)
         info = get_food_info(new_name, confidence)
+        info = _apply_flag_heuristics(info)
         info["source"] = f"Corrected:{item.get('source','user')}"
         updated_items.append(info)
 
     meal_totals = calculate_meal_totals(updated_items)
-    meal_analysis = get_meal_score(meal_totals, {})
+    meal_analysis = get_meal_score(updated_items, meal_totals, {})
+    recs = build_recommendations(updated_items, meal_totals)
     return {
         "detected_items": updated_items,
         "meal_summary": {
             **meal_totals,
             **meal_analysis
-        }
+        },
+        "recommendations": recs
     }
