@@ -6,6 +6,7 @@ import logging
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from app.synonyms import normalize_food_name, is_beverage, is_dessert
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +61,16 @@ class FoodHeuristics:
     def enrich_food_item(self, food_item: Dict[str, Any]) -> Dict[str, Any]:
         name = food_item['name']
         
+        # Normalize name using synonyms
+        canonical_name = normalize_food_name(name)
+        
         # Try to find exact match (case-insensitive)
-        nutrition_data = self._find_nutrition_data(name)
-        glycemic_index = self._find_glycemic_index(name)
+        nutrition_data = self._find_nutrition_data(canonical_name)
+        glycemic_index = self._find_glycemic_index(canonical_name)
         
         # Build enriched item
         enriched = {
-            "name": name,
+            "name": canonical_name,  # Use canonical name
             "confidence": food_item['confidence'],
             "source": food_item['source'],
             "calories": nutrition_data.get('calories', 0),

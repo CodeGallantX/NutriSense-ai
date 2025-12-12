@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { sendFoodAnalysisMessage, createConversation } from "@/app/actions/chat";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-// Define BACKEND_API (use env var)
-const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "";
+// Define BACKEND_API (use env var or fallback to production)
+const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "https://nutrisense-ai-y5xx.onrender.com";
 
 interface AnalyzerModalProps {
   isOpen: boolean;
@@ -134,18 +134,31 @@ export default function AnalyzerModal({
       formData.append("ulcer", "false");
       formData.append("weight_loss", "false");
 
-      // Call scan-food API
+      // Call scan-food API with proper error handling
+      console.log("Calling backend API:", `${BACKEND_API}/scan-food/`);
+      
       const scanRes = await fetch(`${BACKEND_API}/scan-food/`, {
         method: "POST",
         body: formData,
+        mode: "cors",
+        credentials: "omit",
       });
 
+      console.log("Response status:", scanRes.status);
+
       if (!scanRes.ok) {
-        throw new Error(`Scan failed: ${scanRes.statusText}`);
+        const errorText = await scanRes.text();
+        console.error("Backend error:", errorText);
+        throw new Error(`Scan failed: ${scanRes.statusText} - ${errorText}`);
       }
 
       const scanOutput = await scanRes.json();
       console.log("Scan Output:", scanOutput);
+      
+      // Check if response has error status
+      if (scanOutput.status === "error") {
+        throw new Error(scanOutput.message || "Analysis failed");
+      }
 
       // Call new server action for food analysis message
       const { assistantResponse } =
