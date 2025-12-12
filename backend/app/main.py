@@ -907,7 +907,6 @@ def health_with_slash():
     "/scan-food-yolo-mistral/",
     tags=["Food Detection"],
     summary="Advanced Food Detection (YOLO + Mistral AI)",
-    response_model=ScanFoodResponse,
     responses={
         200: {"description": "Successful food detection and analysis using YOLO + Mistral fusion"},
         400: {"description": "Invalid image format"},
@@ -1002,7 +1001,7 @@ async def scan_food_yolo_mistral(
         # Step 1: YOLO Detection
         logger.info("Step 1: Running YOLO detection...")
         yolo_detector = get_yolo_detector()
-        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=320)
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=640)
         logger.info(f"YOLO detected {len(yolo_results)} items")
         
         # Step 2: Mistral Validation (optional - graceful fallback)
@@ -1162,7 +1161,7 @@ async def scan_food(
 
         # Use new pipeline but keep legacy route
         yolo_detector = get_yolo_detector()
-        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=320)
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=640)
 
         fusion_engine = get_fusion_engine()
         fused_results = fusion_engine.fuse(yolo_results, [])

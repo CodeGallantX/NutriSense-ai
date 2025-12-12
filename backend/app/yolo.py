@@ -1,7 +1,3 @@
-"""
-YOLO Food Detection Module
-Handles food detection using YOLOv8 ONNX model
-"""
 import logging
 from typing import List, Dict, Any
 from pathlib import Path
@@ -14,7 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 class YOLOFoodDetector:    
+    _instance_count = 0  # Safeguard: track instantiation count
+    
     def __init__(self, model_path: str = None):
+        YOLOFoodDetector._instance_count += 1
+        
+        if YOLOFoodDetector._instance_count > 1:
+            logger.warning(
+                f"MULTIPLE YOLO INSTANCES DETECTED ({YOLOFoodDetector._instance_count})! "
+                f"This will cause memory leaks. Use get_yolo_detector() singleton instead!"
+            )
+        
         if model_path is None:
             # Default path to existing model
             base_path = Path(__file__).parent
@@ -29,8 +35,9 @@ class YOLOFoodDetector:
         
         try:
             # Load YOLO model (Ultralytics handles ONNX); explicitly set task to silence warnings
+            # ONNX session is cached internally by Ultralytics - no explicit session management needed
             self.model = YOLO(str(self.model_path), task="detect")
-            logger.info("YOLO model loaded successfully")
+            logger.info("YOLO model loaded successfully (ONNX session cached)")
             
             # Load class names if available
             yaml_path = self.model_path.parent / "chownet_data.yaml"
@@ -47,7 +54,8 @@ class YOLOFoodDetector:
                 import yaml
                 with open(yaml_path, 'r') as f:
                     data = yaml.safe_load(f)
-                    if 'names' in data:
+                    # Check if data is not None and contains 'names' key
+                    if data and isinstance(data, dict) and 'names' in data:
                         return data['names']
         except Exception as e:
             logger.warning(f"Could not load class names from YAML: {e}")
@@ -72,7 +80,7 @@ class YOLOFoodDetector:
             # Convert PIL to numpy array for YOLO
             img_array = np.array(image)
             
-            # Run inference
+            # Run inference - reuses cached ONNX session (no re-initialization)
             results = self.model.predict(
                 img_array,
                 conf=confidence_threshold,
