@@ -319,26 +319,63 @@ def get_yolo_seg_model():
 
 NUTRITION_PATH = BASE_DIR / "data" / "nutrition_db.json"
 GI_PATH = BASE_DIR / "data" / "glycemic_index.json"
+FOODS_EXT_PATH = BASE_DIR / "data" / "foods_extended.json"
 
 def _load_json_or_empty(path: Path):
     try:
         with open(path, "r") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+        return {} if path.suffix == ".json" else []
+
+
+def _normalize(name: str) -> str:
+    return name.strip().lower()
+
 
 nutrition_db = _load_json_or_empty(NUTRITION_PATH)
 gi_db = _load_json_or_empty(GI_PATH)
+foods_extended = _load_json_or_empty(FOODS_EXT_PATH) or []
+foods_extended_index = {_normalize(item.get("name", "")): item for item in foods_extended}
+
+
+def _from_extended(food_name: str):
+    entry = foods_extended_index.get(_normalize(food_name))
+    if not entry:
+        return {}, None, None, []
+
+    nutrition = {
+        "calories": entry.get("calories", 0),
+        "carbs": entry.get("carbs", 0),
+        "protein": entry.get("protein", 0),
+        "fat": entry.get("fat", 0),
+        "fiber": entry.get("fiber", 0),
+        "warnings": {},
+        "flags": [],
+    }
+    return nutrition, entry.get("glycemic_index"), entry.get("GI_category"), entry.get("suitable_for", [])
 
 
 def get_food_info(food_name: str, confidence: float):
     nutrition = nutrition_db.get(food_name, {})
+    gi = gi_db.get(food_name)
+    gi_category = None
+    suitable_for = []
+
+    if not nutrition or gi is None:
+        ext_nutrition, ext_gi, gi_category, suitable_for = _from_extended(food_name)
+        if nutrition:
+            nutrition = {**ext_nutrition, **nutrition}
+        else:
+            nutrition = ext_nutrition
+        if gi is None:
+            gi = ext_gi
+
     calories = nutrition.get("calories")
     carbs = nutrition.get("carbs")
     protein = nutrition.get("protein")
     fat = nutrition.get("fat")
     fiber = nutrition.get("fiber")
-    gi = gi_db.get(food_name)
     flags = nutrition.get("flags", [])
     health_warnings = nutrition.get("warnings", {})
     
@@ -361,6 +398,8 @@ def get_food_info(food_name: str, confidence: float):
         "fat": fat,
         "fiber": fiber,
         "glycemic_index": gi,
+        "gi_category": gi_category,
+        "suitable_for": suitable_for,
         "advice": advice,
         "flags": flags,
         "health_warnings": health_warnings
