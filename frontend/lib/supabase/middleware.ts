@@ -29,12 +29,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protected routes
-  const protectedRoutes = ["/dashboard", "/profile", "/analyzer", "/meals", "/diabetes"]
+  const protectedRoutes = ["/dashboard", "/onboarding", "/health-diary", "/meal-planner", "/nutrition-guide", "/food-database"]
   const isProtectedRoute = protectedRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone()
-    url.pathname = "/auth/signin"
+    url.pathname = "/login"
     return NextResponse.redirect(url)
   }
 
