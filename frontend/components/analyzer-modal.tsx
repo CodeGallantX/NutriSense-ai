@@ -31,11 +31,37 @@ type DetectionItem = {
 
 type FinalResult = {
   detected_items: DetectionItem[];
-  meal_summary?: Record<string, any>;
-  recommendations?: Record<string, any>;
+  meal_summary?: Record<string, unknown>;
+  recommendations?: Record<string, unknown>;
   raw?: {
-    yolo?: any;
-    flagship?: any;
+    yolo?: unknown;
+    flagship?: unknown;
+  };
+};
+
+type ScanOutputItem = {
+  name: string;
+  confidence: number;
+  calories: number;
+  carbs: number;
+  protein: number;
+  fiber: number;
+  glycemic_index: number;
+  flags: string[];
+  source: string;
+};
+
+type ScanOutput = {
+  detected_items: ScanOutputItem[];
+  meal_summary: {
+    total_calories: number;
+    score: number;
+    quality: string;
+    recommendations: string[];
+  };
+  recommendations: {
+    healthy_alternatives: string[];
+    portion_adjustments: string[];
   };
 };
 
@@ -168,9 +194,10 @@ export default function AnalyzerModal({
 
       const json = await res.json();
       return json;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Request failed for ${path}:`, err);
-      throw new Error(err?.message || "Network/CORS error. Please retry.");
+      const message = err instanceof Error ? err.message : "Network/CORS error. Please retry.";
+      throw new Error(message);
     }
   };
 
@@ -181,7 +208,7 @@ export default function AnalyzerModal({
     return "bg-red-100 text-red-800 border-red-200";
   };
 
-  const asArray = (value: any): string[] => {
+  const asArray = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.filter(Boolean).map(String);
     if (!value) return [];
     return [String(value)];
@@ -211,29 +238,38 @@ export default function AnalyzerModal({
       setUploadedImageUrl(imageUrl);
 
       // Step 1: Advanced YOLO + Mistral detection
-      let yoloResult: any = null;
+      let yoloResult: unknown = null;
       try {
         yoloResult = await postImage("/scan-food-yolo-mistral/", file);
       } catch (advErr) {
         console.warn("Advanced detection failed, switching to fallback", advErr);
       }
-      let detectionResult = yoloResult;
+      let detectionResult = yoloResult as Record<string, unknown> | null;
 
       // Step 2: Fallback to legacy if nothing found
-      if (!detectionResult?.detected_items?.length) {
+      const detectionItems = detectionResult && typeof detectionResult === 'object' && 'detected_items' in detectionResult
+        ? (detectionResult.detected_items as unknown[])
+        : [];
+      
+      if (!Array.isArray(detectionItems) || detectionItems.length === 0) {
         setStatusMessage("No foods from advanced model — trying fallback detection…");
-        detectionResult = await postImage("/scan-food/", file);
+        detectionResult = await postImage("/scan-food/", file) as Record<string, unknown> | null;
       }
 
       // Step 3: Flagship semantic meal analysis (always)
       setPipelineStage("analyzing");
       setStatusMessage("Analyzing meal nutrition…");
-      const flagshipResult = await postImage("/analyze-meal", file);
+      const flagshipResult = await postImage("/analyze-meal", file) as Record<string, unknown>;
+
+      // Extract detected_items safely
+      const extractedItems = detectionResult && typeof detectionResult === 'object' && 'detected_items' in detectionResult
+        ? (detectionResult.detected_items as DetectionItem[])
+        : [];
 
       const combined: FinalResult = {
-        detected_items: detectionResult?.detected_items || [],
-        meal_summary: flagshipResult?.meal_summary || flagshipResult?.mealSummary || {},
-        recommendations: flagshipResult?.recommendations || {},
+        detected_items: extractedItems,
+        meal_summary: (flagshipResult?.meal_summary || flagshipResult?.mealSummary || {}) as Record<string, unknown>,
+        recommendations: (flagshipResult?.recommendations || {}) as Record<string, unknown>,
         raw: {
           yolo: detectionResult,
           flagship: flagshipResult,
@@ -242,11 +278,36 @@ export default function AnalyzerModal({
 
       setFinalResult(combined);
 
-      // Step 4: Send to chat with insights
+      // Step 4: Normalize to ScanOutput format for chat
+      const normalizedForChat: ScanOutput = {
+        detected_items: combined.detected_items.map(item => ({
+          name: item.name || "Unknown",
+          confidence: item.confidence || 0,
+          calories: item.calories || 0,
+          carbs: item.carbs || 0,
+          protein: item.protein || 0,
+          fiber: item.fiber || 0,
+          glycemic_index: item.glycemic_index || 0,
+          flags: item.flags || [],
+          source: item.source || "detection",
+        })),
+        meal_summary: {
+          total_calories: Number(combined.meal_summary?.total_calories || 0),
+          score: Number(combined.meal_summary?.score || 0),
+          quality: String(combined.meal_summary?.quality || "Unknown"),
+          recommendations: asArray(combined.meal_summary?.recommendations),
+        },
+        recommendations: {
+          healthy_alternatives: asArray(combined.recommendations?.healthy_alternatives),
+          portion_adjustments: asArray(combined.recommendations?.portion_adjustments),
+        },
+      };
+
+      // Step 5: Send to chat with insights
       setPipelineStage("insights");
       setStatusMessage("Generating insights…");
       const { assistantResponse } =
-        await sendFoodAnalysisMessage(userId, convId, userPrompt, combined, imageUrl);
+        await sendFoodAnalysisMessage(userId, convId, userPrompt, normalizedForChat, imageUrl);
 
       const userMessage = `${userPrompt} [Food Image Attached]`;
 
@@ -255,11 +316,12 @@ export default function AnalyzerModal({
       // Reset and close
       resetAnalysis();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Analysis error:", err);
-      const message = err?.message?.toLowerCase().includes("cors")
+      const errMessage = err instanceof Error ? err.message : String(err);
+      const message = errMessage.toLowerCase().includes("cors")
         ? "Network/CORS issue. Please retry or check backend URL."
-        : err?.message || "Failed to analyze image. Please try again.";
+        : errMessage || "Failed to analyze image. Please try again.";
       setError(message);
     } finally {
       setIsAnalyzing(false);
