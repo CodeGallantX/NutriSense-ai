@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Camera,
@@ -15,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import AnalyzerModal from "@/components/analyzer-modal";
 
 export default function DashboardPage() {
   const [messages, setMessages] = useState<
@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +92,22 @@ export default function DashboardPage() {
     fileInputRef.current?.click();
   };
 
+  const handleSendToChat = (userMessage: string, aiResponse: string) => {
+    // Add user message with image attachment
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: userMessage },
+    ]);
+    
+    // Add AI response after a short delay
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: aiResponse },
+      ]);
+    }, 800);
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-br from-teal-50 via-white to-blue-50 flex flex-col">
       {/* Top Section - Centered Heading */}
@@ -138,7 +155,7 @@ export default function DashboardPage() {
             }
           `}
                 >
-                  <p className="text-sm leading-relaxed">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
                     {message.content}
                     {message.role === "assistant" &&
                       index === 0 &&
@@ -156,7 +173,7 @@ export default function DashboardPage() {
             isScrolled ? "shadow-lg" : ""
           }`}
         >
-          {/* Feature Action Buttons - Sticky above input with hidden scrollbar */}
+          {/* Feature Action Buttons */}
           <div className="max-w-3xl mx-auto px-4">
             <div
               className="flex items-center gap-3 overflow-x-auto pb-3 
@@ -168,39 +185,33 @@ export default function DashboardPage() {
               active:overflow-x-auto
               touch-pan-x"
             >
-              <Link href="/analyzer">
-                <Button
-                  onClick={handleImageUpload}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                >
-                  <Camera className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Scan Food</span>
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setShowAnalyzer(true)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
+              >
+                <Camera className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Scan Food</span>
+              </Button>
 
-              <Link href="/meals">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                >
-                  <Utensils className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Meal Planner</span>
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
+              >
+                <Utensils className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Meal Planner</span>
+              </Button>
 
-              <Link href="/health-diary">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
-                >
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Analytics</span>
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 h-auto py-2 px-4 min-w-fit rounded-lg shadow-none hover:bg-accent hover:border-primary transition-all whitespace-nowrap bg-white border border-gray-200"
+              >
+                <TrendingUp className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Analytics</span>
+              </Button>
 
               <Button
                 variant="outline"
@@ -274,6 +285,13 @@ export default function DashboardPage() {
           and security standards for all health information.
         </p>
       </div>
+
+      {/* Analyzer Modal */}
+      <AnalyzerModal
+        isOpen={showAnalyzer}
+        onClose={() => setShowAnalyzer(false)}
+        onSendToChat={handleSendToChat}
+      />
     </div>
   );
 }

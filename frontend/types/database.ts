@@ -1,23 +1,29 @@
 export interface Profile {
-  id: string
-  email: string
-  full_name: string | null
-  age: number | null
-  weight_kg: number | null
-  height_cm: number | null
-  gender: "male" | "female" | "other" | "prefer_not_to_say" | null
-  activity_level: "sedentary" | "light" | "moderate" | "active" | "very_active" | null
-  dietary_preferences: string[] | null
-  allergies: string[] | null
-  health_conditions: string[] | null
-  monthly_budget_usd: number | null
-  cultural_cuisine_preferences: string[] | null
-  has_diabetes: boolean
-  diabetes_type: "type1" | "type2" | "prediabetes" | "gestational" | null
-  target_blood_sugar_min: number | null
-  target_blood_sugar_max: number | null
-  created_at: string
-  updated_at: string
+  id: string;
+  email: string;
+  full_name: string | null;
+  country: string | null;
+  region: string | null;
+  age: number | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  gender: "male" | "female" | "prefer_not_say" | null;
+  primary_goal: string | null;
+  secondary_goals: string[] | null;
+  eating_pattern: string | null;
+  activity_level: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
+  weekly_budget: string | null;
+  dietary_preferences: string[] | null;
+  allergies: string[] | null;
+  health_conditions: string[] | null;
+  cuisine_preferences: string[] | null;
+  has_diabetes: boolean;
+  diabetes_type: "type1" | "type2" | "prediabetes" | null;
+  target_blood_sugar_min: number | null;
+  target_blood_sugar_max: number | null;
+  onboarding_completed: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FoodLog {
