@@ -30,10 +30,38 @@ export default function SignInPage() {
     if (authError) {
       setError(authError.message);
       setLoading(false);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError("User not found.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("onboarding_completed")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      setError(profileError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!profile?.onboarding_completed) {
+      router.push("/onboarding");
     } else {
       router.push("/dashboard");
-      router.refresh();
     }
+
+    router.refresh();
   };
 
   return (

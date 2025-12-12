@@ -1001,7 +1001,8 @@ async def scan_food_yolo_mistral(
         # Step 1: YOLO Detection
         logger.info("Step 1: Running YOLO detection...")
         yolo_detector = get_yolo_detector()
-        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=640)
+        # Slightly lower confidence to improve recall on challenging images
+        yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.20, imgsz=640)
         logger.info(f"YOLO detected {len(yolo_results)} items")
         
         # Step 2: Mistral Validation (optional - graceful fallback)
@@ -1034,11 +1035,48 @@ async def scan_food_yolo_mistral(
         fused_results = fusion_engine.fuse(yolo_results, mistral_results)
         
         if not fused_results:
-            logger.warning("No foods detected in image")
-            raise HTTPException(
-                status_code=404,
-                detail="No foods detected in image. Please try a clearer image with visible food items."
-            )
+            logger.warning("No foods detected via YOLO+Mistral. Running server-side fallbacks...")
+            # Fallback 1: Legacy YOLO-only pipeline
+            try:
+                legacy_yolo_results = yolo_detector.detect_foods(image, confidence_threshold=0.25, imgsz=640)
+                fusion_engine = get_fusion_engine()
+                fused_results = fusion_engine.fuse(legacy_yolo_results, [])
+                logger.info(f"Legacy fallback fused items: {len(fused_results)}")
+            except Exception as e:
+                logger.warning(f"Legacy fallback failed: {e}")
+                fused_results = []
+            
+            # Fallback 2: Flagship comprehensive analysis
+            flagship_result = None
+            try:
+                heuristics_engine = get_heuristics_engine()
+                # Reuse flagship functions if available
+                from app.heuristics import analyze_image, apply_missing_ingredient_heuristics, build_meal_analysis
+                foods_flagship = analyze_image(image, {
+                    "diabetes": False,
+                    "hypertension": False,
+                    "ulcer": False,
+                    "weight_loss": False,
+                    "acid_reflux": False,
+                })
+                foods_flagship = apply_missing_ingredient_heuristics(foods_flagship)
+                flagship_result = build_meal_analysis(foods_flagship, {
+                    "diabetes": False,
+                    "hypertension": False,
+                    "ulcer": False,
+                    "weight_loss": False,
+                    "acid_reflux": False,
+                })
+                logger.info("Flagship fallback analysis completed")
+            except Exception as e:
+                logger.warning(f"Flagship fallback failed: {e}")
+                flagship_result = None
+            
+            if not fused_results and not flagship_result:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No foods detected in image. Please try a clearer image with visible food items."
+                )
         
         # Get fusion statistics
         fusion_stats = fusion_engine.get_statistics(fused_results)
@@ -1064,7 +1102,7 @@ async def scan_food_yolo_mistral(
             meal_summary
         )
         
-        # Build response
+        # Build response (include flagship fallback if present)
         response = {
             "detected_items": [ScanFoodItem(**item).model_dump() for item in enriched_items],
             "meal_summary": ScanMealSummary(**meal_summary).model_dump(),
@@ -1072,6 +1110,8 @@ async def scan_food_yolo_mistral(
             "fusion_stats": fusion_stats,
             "status": "success",
         }
+        if 'flagship_result' in locals() and flagship_result:
+            response["flagship"] = flagship_result
         logger.info("Food detection complete!")
         return response
         
