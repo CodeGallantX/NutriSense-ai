@@ -346,17 +346,28 @@ vercel --prod
 - **Image upload errors**: Check file size (max 5MB) and format (PNG, JPG)
 - **Build errors**: Run `npm install` to ensure all dependencies are installed
 
-For detailed integration guide, see [INTEGRATION.md](backend/INTEGRATION.md)
-
 ---
 
 ## 📚 Documentation
 
-- **API Documentation**: http://localhost:8000/docs (Swagger UI)
-- **Mistral Integration**: [backend/MISTRAL_INTEGRATION.md](backend/MISTRAL_INTEGRATION.md)
-- **Integration Guide**: [backend/INTEGRATION.md](backend/INTEGRATION.md)
-- **Implementation Summary**: [backend/IMPLEMENTATION_SUMMARY.md](backend/IMPLEMENTATION_SUMMARY.md)
-- **Roadmap**: [backend/ROADMAP.md](backend/ROADMAP.md)
+### API Documentation
+- **Interactive API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI when running locally)
+- **Production API**: [https://nutrisense-ai-y5xx.onrender.com/docs](https://nutrisense-ai-y5xx.onrender.com/docs)
+
+### Backend Documentation
+- **Implementation Summary**: [backend/docs/IMPLEMENTATION_SUMMARY.md](backend/docs/IMPLEMENTATION_SUMMARY.md) - Complete backend architecture and features
+- **Roadmap**: [backend/docs/ROADMAP.md](backend/docs/ROADMAP.md) - Future enhancements and development plans
+- **Mistral AI Integration**: [backend/docs/MISTRAL_INTEGRATION.md](backend/docs/MISTRAL_INTEGRATION.md) - Vision API setup and usage
+- **YOLO + DeepSeek Guide**: [backend/docs/YOLO_DEEPSEEK_README.md](backend/docs/YOLO_DEEPSEEK_README.md) - Food detection model details
+- **ONNX Implementation**: [backend/docs/ONNX_IMPLEMENTATION_COMPLETE.md](backend/docs/ONNX_IMPLEMENTATION_COMPLETE.md) - CPU-optimized inference guide
+- **ONNX Caching Reference**: [backend/docs/ONNX_CACHING_QUICK_REFERENCE.md](backend/docs/ONNX_CACHING_QUICK_REFERENCE.md) - Performance optimization
+- **Bug Fix: YOLO Input Size**: [backend/docs/BUGFIX_YOLO_INPUT_SIZE.md](backend/docs/BUGFIX_YOLO_INPUT_SIZE.md) - Resolved 320→640 issue
+
+### Frontend Documentation
+- **Frontend README**: [frontend/README.md](frontend/README.md) - Next.js app setup and components
+
+### Deployment Configuration
+- **Render Deployment**: [backend/render.yaml](backend/render.yaml) - Backend hosting configuration
 
 ---
 
