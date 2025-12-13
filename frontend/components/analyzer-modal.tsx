@@ -229,7 +229,6 @@ export default function AnalyzerModal({
         "food-images",
         file,
       );
-      setUploadedImageUrl(imageUrl);
 
       // Single call: Advanced YOLO + Mistral endpoint (server-side fallback enabled)
       const apiResult = await postImage("/scan-food-yolo-mistral/", file) as Record<string, unknown>;
