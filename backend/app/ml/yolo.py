@@ -22,8 +22,8 @@ class YOLOFoodDetector:
             )
         
         if model_path is None:
-            # Default path to existing model
-            base_path = Path(__file__).parent
+            # Default path to existing model (relative to app/ directory)
+            base_path = Path(__file__).resolve().parent.parent  # app/ml/ -> app/
             model_path = base_path / "ml_models" / "yolo" / "best.onnx"
         
         self.model_path = Path(model_path)

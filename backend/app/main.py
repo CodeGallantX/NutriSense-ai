@@ -17,13 +17,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import new modules for YOLO + Mistral + Heuristics
-from app.yolo import YOLOFoodDetector
+from app.ml.yolo import YOLOFoodDetector
 # TODO: Re-enable DeepSeek integration when needed
-# from app.deepseek import DeepSeekFoodDetector
-from app.mistral import MistralFoodValidator
-from app.fusion import DetectionFusion
-from app.heuristics import FoodHeuristics
-from app.scan_models import (
+# from app.ml.deepseek import DeepSeekFoodDetector
+from app.ml.mistral import MistralFoodValidator
+from app.core.fusion import DetectionFusion
+from app.core.heuristics import FoodHeuristics
+from app.ml.scan_models import (
     ScanFoodResponse,
     FoodDetection as ScanFoodItem,
     MealSummary as ScanMealSummary,
@@ -1051,7 +1051,7 @@ async def scan_food_yolo_mistral(
             try:
                 heuristics_engine = get_heuristics_engine()
                 # Reuse flagship functions if available
-                from app.heuristics import analyze_image, apply_missing_ingredient_heuristics, build_meal_analysis
+                from app.core.heuristics import analyze_image, apply_missing_ingredient_heuristics, build_meal_analysis
                 foods_flagship = analyze_image(image, {
                     "diabetes": False,
                     "hypertension": False,
