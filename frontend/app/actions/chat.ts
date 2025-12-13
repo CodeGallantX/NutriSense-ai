@@ -361,7 +361,7 @@ export async function sendFoodAnalysisMessage(
   conversationId: string,
   userPrompt: string,
   scanOutput: ScanOutput,
-  imageUrl?: string
+  imageUrl?: string  // ← This is your uploaded Supabase public URL
 ): Promise<{ assistantResponse: string }> {
   const supabase = await createServerClient();
 
@@ -376,13 +376,14 @@ export async function sendFoodAnalysisMessage(
     throw new Error('Invalid conversation');
   }
 
-  // Insert user message
+  // Insert user message (with image attached)
+  const userMessageContent = userPrompt.trim() || "Please analyze this meal";
   const { error: insertError } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
       role: 'user',
-      content: `${userPrompt} [Food Analysis Attached]`,
+      content: userMessageContent,
       image_url: imageUrl || null,
     });
 
@@ -397,43 +398,34 @@ export async function sendFoodAnalysisMessage(
     throw new Error('User profile not found');
   }
 
-  // Create specialized system prompt for food analysis
   const baseSystemPrompt = createSystemPrompt(userInfo);
   const foodAnalysisPrompt = `${baseSystemPrompt}
 
 **FOOD ANALYSIS MODE ACTIVATED**
-You are analyzing a food image/scanned meal. Provide a comprehensive nutritional analysis considering:
+You are analyzing a meal from a photo. Always start your response by showing the image clearly at the top using Markdown, then give a detailed, personalized analysis.
 
-1. **Personalized Nutrition Assessment**:
-   - Calorie needs based on age, weight, height, activity level
-   - Macronutrient distribution for user's goals (${userInfo.goals.primaryGoal || 'general health'})
-   - Glycemic impact for diabetes management (if applicable)
-   - Sodium content for hypertension (if applicable)
-   - Allergen safety check
+**MANDATORY: Always begin your response with this exact image syntax (never omit it):**
+![Your meal]({{IMAGE_URL}})
 
-2. **Response Structure**:
-   - **Meal Summary**: What foods were identified with confidence levels
-   - **Nutritional Breakdown**: Calories, carbs, protein, fat, fiber, sugar, sodium
-   - **Health Impact**: Personalized analysis based on user's complete profile
-   - **Portion Guidance**: Recommended serving sizes
-   - **Alternative Suggestions**: Healthier swaps aligned with preferences
-   - **Meal Timing**: When to eat based on goals and conditions
+Then continue with:
+- What foods were detected
+- Full nutritional breakdown
+- Personalized health impact
+- Recommendations & alternatives
+- Portion advice
 
-3. **Special Considerations**:
-   - Diabetes: Carb counting, glycemic load, insulin timing
-   - Weight Goals: Calorie density, satiety factors
-   - Conditions: Respect all health conditions and allergies
-   - Preferences: Align with dietary and cuisine preferences
-   - Budget: Consider cost-effective alternatives if provided`;
+Use clean markdown: bold, bullets, tables if helpful.`;
 
-  // Prepare messages
-  const scanContext = `User uploaded a food image/scan with the following analysis:
-Scan Results: ${JSON.stringify(scanOutput, null, 2)}
+  // Replace placeholder with actual image URL
+  const finalSystemPrompt = foodAnalysisPrompt.replace('{{IMAGE_URL}}', imageUrl || '');
 
-User's specific question: "${userPrompt}"`;
+  const scanContext = `User uploaded a food image and asked: "${userPrompt || "Analyze this meal"}"
+
+Scan Results (for reference):
+${JSON.stringify(scanOutput, null, 2)}`;
 
   const messages: MistralChatMessage[] = [
-    { role: 'system', content: foodAnalysisPrompt },
+    { role: 'system', content: finalSystemPrompt },
     { role: 'user', content: scanContext }
   ];
 
@@ -441,33 +433,47 @@ User's specific question: "${userPrompt}"`;
   const chatResponse = await client.chat.complete({
     model: 'mistral-medium-latest',
     messages,
-    temperature: 0.6, // Slightly lower temperature for more factual responses
+    temperature: 0.6,
   });
 
-  const assistantMessageContent = chatResponse.choices[0].message.content;
-  let assistantResponse: string;
-  if (typeof assistantMessageContent === 'string') {
-    assistantResponse = assistantMessageContent;
-  } else if (Array.isArray(assistantMessageContent)) {
-    assistantResponse = assistantMessageContent
-      .map((chunk: any) => {
-        if (typeof chunk === 'string') {
-          return chunk;
-        }
-        return chunk.text || (chunk as any).toString() || '';
-      })
-      .join('\n');
-  } else {
-    assistantResponse = 'I apologize, but I encountered an issue analyzing your food. Please try again.';
+  let assistantRawContent = chatResponse.choices[0].message.content || '';
+
+  if (typeof assistantRawContent !== 'string') {
+    assistantRawContent = 'I apologize, but I encountered an issue analyzing your food.';
   }
 
-  // Insert assistant response
+  // FINAL STEP: Force image at the very top if not already there (defensive)
+  let finalAssistantContent = assistantRawContent.trim();
+
+  if (imageUrl && !finalAssistantContent.includes(imageUrl)) {
+    const imageMarkdown = `![Your meal](${imageUrl})\n\n`;
+    finalAssistantContent = imageMarkdown + finalAssistantContent;
+  }
+
+  // Optional: Clean up duplicate images or malformed syntax
+  finalAssistantContent = finalAssistantContent.replace(/!\[.*?\]\(https?:\/\/[^\)]+\)/g, (match) => {
+    // Keep only the first image
+    if (match.includes(imageUrl ?? "")) {
+      return match;
+    }
+    return '';
+  }).trim();
+
+  // Ensure image is first
+  if (imageUrl) {
+    const imageLine = `![Your meal](${imageUrl})`;
+    if (!finalAssistantContent.startsWith(imageLine)) {
+      finalAssistantContent = `${imageLine}\n\n${finalAssistantContent.replace(/^!\[.*\]\([^\)]+\)\n*/gm, '')}`;
+    }
+  }
+
+  // Insert assistant response with image embedded
   const { error: assistantError } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
       role: 'assistant',
-      content: assistantResponse,
+      content: finalAssistantContent,
     });
 
   if (assistantError) {
@@ -476,5 +482,5 @@ User's specific question: "${userPrompt}"`;
   }
 
   revalidatePath(`/dashboard/${conversationId}`);
-  return { assistantResponse };
+  return { assistantResponse: finalAssistantContent };
 }
