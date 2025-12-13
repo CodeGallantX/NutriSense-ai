@@ -274,14 +274,14 @@ export default function DashboardLanding() {
           </div>
         </div>
 
-        {/* Fixed Bottom Section with Input and Options (same as chat) */}
+        {/* Sticky Bottom Section with Input and Options (same as chat) */}
         <div
-          className={`fixed bottom-0 left-0 right-0 w-full bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
+          className={`sticky bottom-0 bg-linear-to-t from-white via-white to-transparent pt-4 pb-6 transition-all duration-300 ${
             isScrolled ? "shadow-lg" : ""
           }`}
         >
           {/* Feature Action Buttons */}
-          <div className="w-full max-w-3xl px-4">
+          <div className="max-w-3xl mx-auto px-4">
             <div
               className="flex items-center gap-3 overflow-x-auto pb-3 
               scrollbar-hide 
@@ -356,7 +356,7 @@ export default function DashboardLanding() {
           </div>
 
           {/* Bottom Input */}
-          <div className="w-full max-w-3xl px-4">
+          <div className="max-w-3xl mx-auto px-4">
             <div className="relative">
               <Input
                 value={input}
