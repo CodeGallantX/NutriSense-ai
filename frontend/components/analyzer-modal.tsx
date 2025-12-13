@@ -93,6 +93,8 @@ export default function AnalyzerModal({
   const [userPrompt, setUserPrompt] = useState("Analyze this food");
   const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [showQuickSummary, setShowQuickSummary] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -300,13 +302,8 @@ export default function AnalyzerModal({
         imageUrl
       );
 
-      const userMessage = `${userPrompt} [Food Image Attached]`;
-
-      // Send to chat
-      onSendToChat(userMessage, assistantResponse, convId);
-      // Reset and close
-      resetAnalysis();
-      onClose();
+      // Show completion modal instead of closing
+      setShowCompletion(true);
     } catch (err: unknown) {
       console.error("Analysis error:", err);
       const errMessage = err instanceof Error ? err.message : String(err);
@@ -330,6 +327,8 @@ export default function AnalyzerModal({
     setPipelineStage("idle");
     setStatusMessage(null);
     setUploadedImageUrl(null);
+    setShowCompletion(false);
+    setShowQuickSummary(false);
     stopCamera();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
