@@ -257,7 +257,6 @@ export default function AnalyzerModal({
           flagship,
         },
       };
-
       setFinalResult(combined);
 
       // Step 4: Normalize to ScanOutput format for chat
