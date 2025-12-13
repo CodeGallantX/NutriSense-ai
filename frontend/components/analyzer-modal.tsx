@@ -92,7 +92,8 @@ export default function AnalyzerModal({
   const [error, setError] = useState<string | null>(null);
   const [userPrompt, setUserPrompt] = useState("Analyze this food");
   const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [showQuickSummary, setShowQuickSummary] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -201,13 +202,6 @@ export default function AnalyzerModal({
     }
   };
 
-  const confidenceBadge = (confidence?: number) => {
-    const score = Math.round((confidence ?? 0) * 100);
-    if (score >= 80) return "bg-green-100 text-green-800 border-green-200";
-    if (score >= 50) return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    return "bg-red-100 text-red-800 border-red-200";
-  };
-
   const asArray = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.filter(Boolean).map(String);
     if (!value) return [];
@@ -235,7 +229,6 @@ export default function AnalyzerModal({
         "food-images",
         file,
       );
-      setUploadedImageUrl(imageUrl);
 
       // Single call: Advanced YOLO + Mistral endpoint (server-side fallback enabled)
       const apiResult = await postImage("/scan-food-yolo-mistral/", file) as Record<string, unknown>;
@@ -300,13 +293,8 @@ export default function AnalyzerModal({
         imageUrl
       );
 
-      const userMessage = `${userPrompt} [Food Image Attached]`;
-
-      // Send to chat
-      onSendToChat(userMessage, assistantResponse, convId);
-      // Reset and close
-      resetAnalysis();
-      onClose();
+      // Show completion modal instead of closing
+      setShowCompletion(true);
     } catch (err: unknown) {
       console.error("Analysis error:", err);
       const errMessage = err instanceof Error ? err.message : String(err);
@@ -329,7 +317,8 @@ export default function AnalyzerModal({
     setFinalResult(null);
     setPipelineStage("idle");
     setStatusMessage(null);
-    setUploadedImageUrl(null);
+    setShowCompletion(false);
+    setShowQuickSummary(false);
     stopCamera();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -515,163 +504,171 @@ export default function AnalyzerModal({
               </div>
             </div>
           )}
+        </div>
+      </DialogContent>
+
+      {/* Completion Modal */}
+      <Dialog open={showCompletion} onOpenChange={(open) => {
+        if (!open) {
+          setShowCompletion(false);
+          onSendToChat(`${userPrompt} [Food Image Attached]`, "", conversationId || "");
+          resetAnalysis();
+          onClose();
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            {/* Success Icon */}
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg">
+              <CheckCircle2 className="w-12 h-12 text-white" />
+            </div>
+
+            {/* Success Message */}
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-semibold text-gray-900">
+                Analysis Complete!
+              </h3>
+              <p className="text-sm text-gray-600 max-w-sm">
+                Your meal has been successfully analyzed. The results have been sent to your chat.
+              </p>
+            </div>
+
+            {/* Quick Stats */}
+            {finalResult?.meal_summary && (
+              <div className="grid grid-cols-3 gap-4 w-full">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 text-center border border-blue-200">
+                  <p className="text-2xl font-bold text-blue-700">
+                    {finalResult.detected_items.length}
+                  </p>
+                  <p className="text-xs text-blue-600">Items</p>
+                </div>
+                <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-3 text-center border border-amber-200">
+                  <p className="text-2xl font-bold text-amber-700">
+                    {String(finalResult.meal_summary?.total_calories || 0)}
+                  </p>
+                  <p className="text-xs text-amber-600">kcal</p>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-3 text-center border border-emerald-200">
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {Math.round(Number(finalResult.meal_summary?.score || 0))}
+                  </p>
+                  <p className="text-xs text-emerald-600">Score</p>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3 w-full">
+              <Button
+                onClick={() => {
+                  setShowCompletion(false);
+                  setShowQuickSummary(true);
+                }}
+                className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                View Quick Summary
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowCompletion(false);
+                  onSendToChat(`${userPrompt} [Food Image Attached]`, "", conversationId || "");
+                  resetAnalysis();
+                  onClose();
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Go to Chat
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Summary Modal */}
+      <Dialog open={showQuickSummary} onOpenChange={(open) => {
+        if (!open) {
+          setShowQuickSummary(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Nutrition Summary
+            </DialogTitle>
+          </DialogHeader>
 
           {finalResult && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Detections</p>
-                  <h3 className="text-lg font-semibold text-gray-900">Food items & confidence</h3>
-                </div>
-                <Badge variant="secondary">{finalResult.detected_items.length} items</Badge>
-              </div>
-
-              {finalResult.detected_items.length ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {finalResult.detected_items.map((item, idx) => (
-                    <Card key={`${item.name}-${idx}`} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <CardTitle className="text-base text-gray-900">{item.name || "Unknown item"}</CardTitle>
-                          <Badge className={`border ${confidenceBadge(item.confidence)}`}>
-                            {`${Math.round((item.confidence ?? 0) * 100)}%`}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-gray-500">{item.source || "detection"}</p>
-                      </CardHeader>
-                      <CardContent className="space-y-3 text-sm text-gray-800">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-md bg-gray-50 p-2">
-                            <p className="text-xs text-gray-500">Calories</p>
-                            <p className="font-semibold">{item.calories ?? "—"} kcal</p>
-                          </div>
-                          <div className="rounded-md bg-gray-50 p-2">
-                            <p className="text-xs text-gray-500">GI</p>
-                            <p className="font-semibold">{item.glycemic_index ?? "—"}</p>
-                          </div>
-                          <div className="rounded-md bg-gray-50 p-2">
-                            <p className="text-xs text-gray-500">Carbs</p>
-                            <p className="font-semibold">{item.carbs ?? "—"} g</p>
-                          </div>
-                          <div className="rounded-md bg-gray-50 p-2">
-                            <p className="text-xs text-gray-500">Protein</p>
-                            <p className="font-semibold">{item.protein ?? "—"} g</p>
-                          </div>
-                          <div className="rounded-md bg-gray-50 p-2">
-                            <p className="text-xs text-gray-500">Fat</p>
-                            <p className="font-semibold">{item.fat ?? "—"} g</p>
-                          </div>
-                          <div className="rounded-md bg-gray-50 p-2">
-                            <p className="text-xs text-gray-500">Fiber</p>
-                            <p className="font-semibold">{item.fiber ?? "—"} g</p>
-                          </div>
-                        </div>
-                        {asArray(item.flags).length ? (
-                          <div className="flex flex-wrap gap-2">
-                            {asArray(item.flags).map((flag, flagIdx) => (
-                              <Badge key={`${flag}-${flagIdx}`} variant="outline">
-                                {flag}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : null}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3 rounded-lg border border-dashed border-gray-300 bg-white p-4 text-center">
-                  <p className="font-semibold text-gray-900">No foods detected — try another angle or better lighting.</p>
-                  <p className="text-sm text-gray-600">We still ran nutrition analysis; you can retake and retry.</p>
-                  <div className="flex items-center justify-center gap-3">
-                    {selectedImage && (
-                      <img
-                        src={selectedImage}
-                        alt="Scanned preview"
-                        className="h-20 w-20 rounded-md border object-cover"
-                      />
-                    )}
-                    {!selectedImage && uploadedImageUrl && (
-                      <img
-                        src={uploadedImageUrl}
-                        alt="Uploaded preview"
-                        className="h-20 w-20 rounded-md border object-cover"
-                      />
-                    )}
-                  </div>
-                  <Button variant="outline" onClick={resetAnalysis} className="mt-1">
-                    Retake Photo
-                  </Button>
-                </div>
-              )}
-
+              {/* Nutrition Section */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Nutrition</p>
-                    <h3 className="text-lg font-semibold text-gray-900">Meal summary</h3>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    🥗
                   </div>
-                  {finalResult.meal_summary?.score ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Quality: {String(finalResult.meal_summary?.quality || "N/A")}</Badge>
-                      <Badge variant="secondary">Score {Math.round(Number(finalResult.meal_summary.score))}/100</Badge>
-                    </div>
-                  ) : null}
-                </div>
+                  Meal Nutrition
+                </h3>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Card className="shadow-sm">
+                  <Card className="shadow-sm border-primary/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Energy & Macros</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm text-gray-800">
                       <div className="grid grid-cols-2 gap-2">
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Calories</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.total_calories ?? "—")} kcal</p>
                         </div>
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Carbs</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.total_carbs ?? "—")} g</p>
                         </div>
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Protein</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.total_protein ?? "—")} g</p>
                         </div>
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Fat</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.total_fat ?? "—")} g</p>
                         </div>
                       </div>
-                      {finalResult.meal_summary?.score ? (
+                      {finalResult.meal_summary?.score !== undefined && finalResult.meal_summary?.score !== null && (
                         <div className="pt-2">
                           <p className="text-xs text-gray-500 mb-1">Meal score</p>
                           <Progress value={Number(finalResult.meal_summary.score)} className="h-2" />
+                          <p className="text-xs text-gray-600 mt-1 text-right">
+                            {Math.round(Number(finalResult.meal_summary.score))}/100
+                          </p>
                         </div>
-                      ) : null}
+                      )}
                     </CardContent>
                   </Card>
 
-                  <Card className="shadow-sm">
+                  <Card className="shadow-sm border-primary/20">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Metabolic Signals</CardTitle>
+                      <CardTitle className="text-base">Health Metrics</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm text-gray-800">
                       <div className="grid grid-cols-2 gap-2">
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Glycemic Load</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.glycemic_load ?? "—")}</p>
                         </div>
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Fiber</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.total_fiber ?? "—")} g</p>
                         </div>
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Sodium</p>
                           <p className="font-semibold">{String(finalResult.meal_summary?.total_sodium ?? "—")} mg</p>
                         </div>
-                        <div>
+                        <div className="bg-gray-50 rounded-md p-2">
                           <p className="text-xs text-gray-500">Quality</p>
-                          <p className="font-semibold">{String(finalResult.meal_summary?.quality ?? "—")}</p>
+                          <Badge variant="outline" className="font-semibold">
+                            {String(finalResult.meal_summary?.quality ?? "—")}
+                          </Badge>
                         </div>
                       </div>
                     </CardContent>
@@ -679,76 +676,81 @@ export default function AnalyzerModal({
                 </div>
               </div>
 
+              {/* AI Recommendations */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  <div>
-                    <p className="text-sm text-gray-500">AI Recommendations</p>
-                    <h3 className="text-lg font-semibold text-gray-900">Healthier swaps & portions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    ✨
                   </div>
-                </div>
+                  AI Recommendations
+                </h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {asArray(finalResult.recommendations?.healthy_alternatives).length ? (
-                    <Card className="shadow-sm">
+                  {asArray(finalResult.recommendations?.healthy_alternatives).length > 0 && (
+                    <Card className="shadow-sm border-emerald-200 bg-emerald-50/30">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Healthy alternatives</CardTitle>
+                        <CardTitle className="text-base text-emerald-700">Healthy Alternatives</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2 text-sm text-gray-800">
                         {asArray(finalResult.recommendations?.healthy_alternatives).map((alt, idx) => (
                           <div key={`alt-${idx}`} className="flex items-start gap-2">
-                            <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span>
+                            <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
                             <span>{alt}</span>
                           </div>
                         ))}
                       </CardContent>
                     </Card>
-                  ) : null}
+                  )}
 
-                  {asArray(finalResult.recommendations?.portion_adjustments).length ? (
-                    <Card className="shadow-sm">
+                  {asArray(finalResult.recommendations?.portion_adjustments).length > 0 && (
+                    <Card className="shadow-sm border-blue-200 bg-blue-50/30">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Portion guidance</CardTitle>
+                        <CardTitle className="text-base text-blue-700">Portion Guidance</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2 text-sm text-gray-800">
                         {asArray(finalResult.recommendations?.portion_adjustments).map((alt, idx) => (
                           <div key={`portion-${idx}`} className="flex items-start gap-2">
-                            <span className="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                            <span className="mt-1 h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></span>
                             <span>{alt}</span>
                           </div>
                         ))}
                       </CardContent>
                     </Card>
-                  ) : null}
+                  )}
 
-                  {asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).length ? (
-                    <Card className="shadow-sm">
+                  {asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).length > 0 && (
+                    <Card className="shadow-sm border-amber-200 bg-amber-50/30">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-base">What to add</CardTitle>
+                        <CardTitle className="text-base text-amber-700">What to Add</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2 text-sm text-gray-800">
                         {asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).map((alt, idx) => (
                           <div key={`add-${idx}`} className="flex items-start gap-2">
-                            <span className="mt-1 h-2 w-2 rounded-full bg-amber-500"></span>
+                            <span className="mt-1 h-2 w-2 rounded-full bg-amber-500 flex-shrink-0"></span>
                             <span>{alt}</span>
                           </div>
                         ))}
                       </CardContent>
                     </Card>
-                  ) : null}
-
-                  {(!asArray(finalResult.recommendations?.healthy_alternatives).length &&
-                    !asArray(finalResult.recommendations?.portion_adjustments).length &&
-                    !asArray(finalResult.recommendations?.what_to_add || finalResult.recommendations?.additions).length) && (
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                        Recommendations will appear here once the analysis completes.
-                      </div>
                   )}
                 </div>
               </div>
+
+              {/* Action Button */}
+              <Button
+                onClick={() => {
+                  setShowQuickSummary(false);
+                  onSendToChat(`${userPrompt} [Food Image Attached]`, "", conversationId || "");
+                  resetAnalysis();
+                  onClose();
+                }}
+                className="w-full"
+              >
+                Continue to Chat
+              </Button>
             </div>
           )}
-        </div>
-      </DialogContent>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
