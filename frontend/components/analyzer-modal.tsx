@@ -14,6 +14,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 // Define BACKEND_API (use env var or fallback to production)
 const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "https://nutrisense-ai-y5xx.onrender.com";
 
+// Feature flag: Set to false to disable completion/summary dialogs and auto-continue to chat
+const ENABLE_COMPLETION_DIALOGS = false;
+
 type PipelineStage = "idle" | "detecting" | "analyzing" | "insights";
 
 type DetectionItem = {
@@ -285,7 +288,7 @@ export default function AnalyzerModal({
       // Step 5: Send to chat with insights
       setPipelineStage("insights");
       setStatusMessage("Generating insights…");
-      const { assistantResponse } = await sendFoodAnalysisMessage(
+      await sendFoodAnalysisMessage(
         userId,
         convId,
         userPrompt,
@@ -293,8 +296,16 @@ export default function AnalyzerModal({
         imageUrl
       );
 
-      // Show completion modal instead of closing
-      setShowCompletion(true);
+      if (ENABLE_COMPLETION_DIALOGS) {
+        // Show completion modal
+        setShowCompletion(true);
+      } else {
+        // Auto-continue to chat (typing animation will show there)
+        const userMessage = `${userPrompt} [Food Image Attached]`;
+        onSendToChat(userMessage, "", convId);
+        resetAnalysis();
+        onClose();
+      }
     } catch (err: unknown) {
       console.error("Analysis error:", err);
       const errMessage = err instanceof Error ? err.message : String(err);
@@ -508,6 +519,7 @@ export default function AnalyzerModal({
       </DialogContent>
 
       {/* Completion Modal */}
+      {ENABLE_COMPLETION_DIALOGS && (
       <Dialog open={showCompletion} onOpenChange={(open) => {
         if (!open) {
           setShowCompletion(false);
@@ -585,8 +597,10 @@ export default function AnalyzerModal({
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Quick Summary Modal */}
+      {ENABLE_COMPLETION_DIALOGS && (
       <Dialog open={showQuickSummary} onOpenChange={(open) => {
         if (!open) {
           setShowQuickSummary(false);
@@ -751,6 +765,7 @@ export default function AnalyzerModal({
           )}
         </DialogContent>
       </Dialog>
+      )}
     </Dialog>
   );
 }
